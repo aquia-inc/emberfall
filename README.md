@@ -44,6 +44,12 @@ Piping to stdin is helpful when wanting to embed the config as a raw string in o
 
 ### Installation
 
+**Homebrew**
+```sh
+brew tap aquia-inc/emberfall https://github.com/aquia-inc/emberfall
+brew install emberfall
+```
+**Build from Source**
 1. Fork or clone this repository
 2. From the project root run
 ```bash
