@@ -1,0 +1,20 @@
+name: Analysis
+
+on:
+  workflow_call:
+
+jobs:
+  Lint-Go:
+    name: Lint Go
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: LINT - go
+        uses: dominikh/staticcheck-action@v1
+        with:
+          version: "latest"
+          working-directory: ./

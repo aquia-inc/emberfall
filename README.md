@@ -1,7 +1,7 @@
-<img align="right" width="200" src="./emberfall-logo.png">
-
+[![Go Report Card](https://goreportcard.com/badge/github.com/aquia-inc/emberfall)](https://goreportcard.com/report/github.com/aquia-inc/emberfall) 
 # Emberfall
 
+<img align="right" width="200" src="./emberfall-logo.png">
 **HTTP smoke testing made easy.**
 
 Simply declare a list of URLs and their expected response values, and Emberfall will test, compare, and report which URLs fail along with details of what expectations were not met.
