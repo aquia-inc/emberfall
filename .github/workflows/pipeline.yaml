@@ -17,6 +17,10 @@ jobs:
     name: Analysis
     uses: ./.github/workflows/analysis.yaml
 
+  tests:
+    name: Tests
+    uses: ./.github/workflows/tests.yaml
+
   release:
     name: Release
     needs: analysis
