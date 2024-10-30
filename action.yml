@@ -1,0 +1,51 @@
+# Copyright (2024) Aquia, Inc.
+# https://www.aquia.us
+name: "Emberfall"
+description: "HTTP Smoke testing made easy!"
+inputs:
+  version:
+    description: "Emberfall version"
+    required: true
+  config:
+    description: "Emberfall tests config in YAML format"
+    required: true
+runs:
+    using: "composite"
+    steps:
+      
+      - name: Download emberfall
+        shell: bash
+        id: download
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ ${{ runner.arch }} = "ARM64" ]; then
+            EF_ARCH="arm64"
+          elif [ ${{ runner.arch }} = "X86" ]; then
+            EF_ARCH="i386"
+          elif [ ${{ runner.arch }} = "X64" ]; then
+            EF_ARCH="x86_64"
+          fi
+
+          EF_OS = ${{ runner.os }}
+          if [ ${{ runner.os == "macOS" }} ]; then
+            EF_OS = "Darwin"
+          fi
+            
+          URL="https://github.com/aquia-inc/emberfall/releases/download/v${VERSION}/emberfall_${EF_OS}_${EF_ARCH}.tar.gz"
+          
+          echo "Downloading $URL"
+          curl -H user-agent:emberfall-github-action -L "$URL" -o emberfall.tgz --max-time 300 --fail
+         
+          tar -C /tmp -xzf emberfall.tgz
+          rm emberfall.tgz
+          EF_PATH=/tmp/emberfall_${VERSION}_${EF_ARCH}
+          sudo mv "${EF_PATH}/emberfall" /usr/bin
+      
+      - name: Start emberfall
+        shell: bash
+        env:
+          CONFIG: ${{ inputes.config }}
+        run: |
+          echo $CONFIG | emberfall --config -
+          
