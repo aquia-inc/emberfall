@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -55,5 +56,10 @@ func (t *test) report(res *http.Response) {
 		for _, e := range errors {
 			fmt.Printf("  %s\n", e)
 		}
+		code := len(errors)
+		if code > 125 {
+			code = 125
+		}
+		os.Exit(code)
 	}
 }
