@@ -9,13 +9,14 @@ import (
 )
 
 type test struct {
-	Url     string            `json:"url"`
-	Method  string            `json:"method"`
-	Headers map[string]string `json:"headers"`
-	Expect  struct {
-		Status  int               `json:"status"`
-		Body    *string           `json:"body,omitempty"`
-		Headers map[string]string `json:"headers,omitempty"`
+	Url            string            `yaml:"url"`
+	Method         string            `yaml:"method"`
+	Headers        map[string]string `yaml:"headers"`
+	FollowRedirect bool              `yaml:"follow"`
+	Expect         struct {
+		Status  int               `yaml:"status"`
+		Body    *string           `yaml:"body,omitempty"`
+		Headers map[string]string `yaml:"headers,omitempty"`
 	}
 }
 
@@ -24,14 +25,14 @@ func (t *test) report(res *http.Response) {
 	result := "PASS"
 
 	if t.Expect.Status != res.StatusCode {
-		errors = append(errors, fmt.Sprintf("expected %d got %d", t.Expect.Status, res.StatusCode))
+		errors = append(errors, fmt.Sprintf("expected status == %d got %d", t.Expect.Status, res.StatusCode))
 	}
 
 	if t.Expect.Body != nil {
 		b, _ := io.ReadAll(res.Body)
 		bs := strings.TrimSpace(string(b))
 		if *t.Expect.Body != bs {
-			errors = append(errors, fmt.Sprintf("expected body %s != %s", *t.Expect.Body, bs))
+			errors = append(errors, fmt.Sprintf("expected body == %s got %s", *t.Expect.Body, bs))
 		}
 	}
 
@@ -42,7 +43,7 @@ func (t *test) report(res *http.Response) {
 			if !ok {
 				errors = append(errors, fmt.Sprintf("expected header %s was missing", expectedHeader))
 			} else if expectedValue != value {
-				errors = append(errors, fmt.Sprintf("expected header %s:%v != %v", expectedHeader, expectedValue, value))
+				errors = append(errors, fmt.Sprintf("expected header %s:%v got %v", expectedHeader, expectedValue, value))
 			}
 		}
 	}
@@ -51,7 +52,7 @@ func (t *test) report(res *http.Response) {
 		result = "FAIL"
 	}
 
-	fmt.Printf("%s : %s\n", result, t.Url)
+	fmt.Printf("%s : %s %s\n", result, t.Method, t.Url)
 	if len(errors) > 0 {
 		for _, e := range errors {
 			fmt.Printf("  %s\n", e)
