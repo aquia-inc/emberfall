@@ -19,6 +19,7 @@ Tests are defined in a simple YAML document that defines the following keys:
 tests:
 - url: string
   method: string #a supported HTTP method such as GET, POST, PUT, DELETE, etc...
+  follow: bool # optional, whether to follow redirects or not, defaults to false
   expect:
     status: int #a supported HTTP status code such as 200,201,301,400,404, etc...
     body: string # optional
