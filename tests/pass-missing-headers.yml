@@ -1,0 +1,9 @@
+tests:
+  - url: https://www.google.com
+    method: GET
+    expect:
+      status: 200 
+      headers:
+        content-type: "text/html; charset=ISO-8859-1"
+        server: "gws"
+        x-no-exist: "should be missing"

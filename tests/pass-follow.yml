@@ -1,0 +1,6 @@
+tests:
+  - url: https://google.com
+    method: GET
+    follow: true
+    expect:
+      status: 200 # should pass by following redirect
