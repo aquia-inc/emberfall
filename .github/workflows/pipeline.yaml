@@ -19,6 +19,7 @@ jobs:
 
   tests:
     name: Tests
+    needs: analysis
     uses: ./.github/workflows/tests.yaml
 
   release:
