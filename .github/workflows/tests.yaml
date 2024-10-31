@@ -4,8 +4,8 @@ on:
   workflow_call:
 
 jobs:
-  Lint-Go:
-    name: Lint Go
+  tests:
+    name: BATS cli
     runs-on: ubuntu-latest
     permissions:
       contents: read
