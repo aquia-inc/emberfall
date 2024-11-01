@@ -20,6 +20,7 @@ func Run(cfg *config) (success bool) {
 
 		if err != nil {
 			fmt.Println(err)
+			failures++
 			continue
 		}
 
@@ -36,13 +37,17 @@ func Run(cfg *config) (success bool) {
 		res, err = client.Do(req)
 		if err != nil {
 			fmt.Println(err)
+			failures++
 			continue
 		}
 
-		success = test.report(res)
-		if !success {
+		if !test.report(res) {
 			failures++
 		}
+	}
+
+	if failures == 0 {
+		success = true
 	}
 
 	fmt.Printf("\n Ran %d tests with %d failures\n", len(cfg.Tests), failures)
