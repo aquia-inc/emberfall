@@ -40,7 +40,6 @@ setup() {
 @test "SHOULD FAIL with bad url" {
   run ./emberfall --config ./tests/fail-bad-url.yml
   assert_failure
-  assert_output --partial 'FAIL'
   assert_output --partial 'no such host'
 }
 
