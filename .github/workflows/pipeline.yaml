@@ -17,9 +17,16 @@ jobs:
     name: Analysis
     uses: ./.github/workflows/analysis.yaml
 
+  tests:
+    name: Tests
+    needs: analysis
+    uses: ./.github/workflows/tests.yaml
+
   release:
     name: Release
-    needs: analysis
+    needs: 
+      - analysis
+      - tests
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/release.yaml
     secrets: inherit

@@ -10,8 +10,7 @@ import (
 )
 
 type config struct {
-	Run   string  `json:"run"`
-	Tests []*test `json:"tests"`
+	Tests []*test `yaml:"tests"`
 }
 
 func LoadConfig(configPath string) (*config, error) {
@@ -46,5 +45,6 @@ func LoadConfig(configPath string) (*config, error) {
 
 	conf := &config{}
 	err = yaml.Unmarshal(b, conf)
+
 	return conf, err
 }

@@ -7,9 +7,10 @@ import (
 
 func Run(cfg *config) {
 	var (
-		req *http.Request
-		res *http.Response
-		err error
+		client *http.Client = &http.Client{}
+		req    *http.Request
+		res    *http.Response
+		err    error
 	)
 
 	for _, test := range cfg.Tests {
@@ -25,7 +26,13 @@ func Run(cfg *config) {
 			req.Header.Set(k, v)
 		}
 
-		res, err = http.DefaultClient.Do(req)
+		if test.FollowRedirect {
+			client.CheckRedirect = nil
+		} else {
+			client.CheckRedirect = noRedirect
+		}
+
+		res, err = client.Do(req)
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -33,4 +40,8 @@ func Run(cfg *config) {
 
 		test.report(res)
 	}
+}
+
+func noRedirect(req *http.Request, via []*http.Request) error {
+	return http.ErrUseLastResponse
 }

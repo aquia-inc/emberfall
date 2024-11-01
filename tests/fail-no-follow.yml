@@ -1,0 +1,5 @@
+tests:
+  - url: https://google.com
+    method: GET
+    expect:
+      status: 200 # should fail with != 301
