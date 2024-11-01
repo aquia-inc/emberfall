@@ -5,10 +5,10 @@
 
 **HTTP smoke testing made easy.**
 
-Simply declare a list of URLs and their expected response values, and Emberfall will test, compare, and report which URLs fail along with details of what expectations were not met.
+Simply declare a list of URLs and their expected response values, and Emberfall will test, compare, and report which URLs fail along with details of what expectations were not met. Tests are merely a list of request objects, each with a url, method, headers to be sent, and an expects field. With the `expects` field you can define the status code, body contents (as a string), and any headers (as strings) that should be present in the response. If anything expected is not present or not equal to the defined value `emberfall` will exit with a non-zero code.
+
 
 ## Configuring Tests
-Tests are merely a list of request objects, each with a url, method, headers to be sent, and an expects field. With the `expects` field you can define the status code, body contents (as a string), and any headers (as strings) that should be present in the response. If anything expected is not present or not equal to the defined value `emberfall` will exit with a non-zero code.
 
 The YAML tests config can be provided in two ways:
 - as a file: `emberfall --config path/to/config.yaml`

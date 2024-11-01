@@ -25,13 +25,11 @@ func LoadConfig(configPath string) (*config, error) {
 	if configPath == "-" {
 		stat, err = os.Stdin.Stat()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return nil, err
 		}
 
 		if stat.Size() < 1 {
-			fmt.Println("no config provided")
-			os.Exit(1)
+			return nil, fmt.Errorf("no config provided")
 		}
 
 		b, err = io.ReadAll(os.Stdin)

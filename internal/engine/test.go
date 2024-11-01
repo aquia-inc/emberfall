@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -20,9 +19,13 @@ type test struct {
 	}
 }
 
-func (t *test) report(res *http.Response) {
-	var errors []string
-	result := "PASS"
+func (t *test) report(res *http.Response) (success bool) {
+	errors := []string{}
+
+	result := map[bool]string{
+		true:  "PASS",
+		false: "FAIL",
+	}
 
 	if t.Expect.Status != res.StatusCode {
 		errors = append(errors, fmt.Sprintf("expected status == %d got %d", t.Expect.Status, res.StatusCode))
@@ -48,19 +51,16 @@ func (t *test) report(res *http.Response) {
 		}
 	}
 
-	if len(errors) > 0 {
-		result = "FAIL"
+	if len(errors) == 0 {
+		success = true
 	}
 
-	fmt.Printf("%s : %s %s\n", result, t.Method, t.Url)
+	fmt.Printf("%s : %s %s\n", result[success], t.Method, t.Url)
 	if len(errors) > 0 {
 		for _, e := range errors {
 			fmt.Printf("  %s\n", e)
 		}
-		code := len(errors)
-		if code > 125 {
-			code = 125
-		}
-		os.Exit(code)
 	}
+
+	return
 }
