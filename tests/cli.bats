@@ -29,11 +29,18 @@ setup() {
   assert_output --partial 'PASS'
 }
 
-
 @test "SHOULD FAIL with missing headers" {
-  run ./emberfall --config ./tests/pass-missing-headers.yml
+  run ./emberfall --config ./tests/fail-missing-headers.yml
   assert_failure
   assert_output --partial 'FAIL'
   assert_output --partial 'expected header x-no-exist was missing'
+}
+
+
+@test "SHOULD FAIL with bad url" {
+  run ./emberfall --config ./tests/fail-bad-url.yml
+  assert_failure
+  assert_output --partial 'FAIL'
+  assert_output --partial 'no such host'
 }
 
