@@ -5,12 +5,13 @@ import (
 	"net/http"
 )
 
-func Run(cfg *config) {
+func Run(cfg *config) (success bool) {
 	var (
-		client *http.Client = &http.Client{}
-		req    *http.Request
-		res    *http.Response
-		err    error
+		client   *http.Client = &http.Client{}
+		req      *http.Request
+		res      *http.Response
+		err      error
+		failures int
 	)
 
 	for _, test := range cfg.Tests {
@@ -19,6 +20,7 @@ func Run(cfg *config) {
 
 		if err != nil {
 			fmt.Println(err)
+			failures++
 			continue
 		}
 
@@ -35,11 +37,21 @@ func Run(cfg *config) {
 		res, err = client.Do(req)
 		if err != nil {
 			fmt.Println(err)
+			failures++
 			continue
 		}
 
-		test.report(res)
+		if !test.report(res) {
+			failures++
+		}
 	}
+
+	if failures == 0 {
+		success = true
+	}
+
+	fmt.Printf("\n Ran %d tests with %d failures\n", len(cfg.Tests), failures)
+	return
 }
 
 func noRedirect(req *http.Request, via []*http.Request) error {

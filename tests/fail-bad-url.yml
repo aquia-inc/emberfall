@@ -1,0 +1,5 @@
+tests:
+  - url: https://dfsdfkshfawsladfkhj.com
+    method: GET
+    expect:
+      status: 200 # should fail with != 301

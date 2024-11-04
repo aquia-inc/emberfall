@@ -16,7 +16,7 @@ import (
 var configPath string
 
 var rootCmd = &cobra.Command{
-	Use:   "gatling",
+	Use:   "emberfall",
 	Short: "Declarative API Testing",
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath = strings.TrimSpace(configPath)
@@ -25,7 +25,10 @@ var rootCmd = &cobra.Command{
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		engine.Run(conf)
+
+		if !engine.Run(conf) {
+			os.Exit(2)
+		}
 	},
 }
 
