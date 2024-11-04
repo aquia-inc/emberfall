@@ -88,7 +88,7 @@ Define tests in a YAML file like show above, and run emberfall: `emberfall --con
 
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.1.0
+   version: 0.2.0
    config: | 
     ---
     tests:  

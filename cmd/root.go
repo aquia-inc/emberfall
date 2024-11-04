@@ -16,8 +16,9 @@ import (
 var configPath string
 
 var rootCmd = &cobra.Command{
-	Use:   "emberfall",
-	Short: "Declarative API Testing",
+	Use:     "emberfall",
+	Short:   "Declarative API Testing",
+	Version: "0.2.0",
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath = strings.TrimSpace(configPath)
 		conf, err := engine.LoadConfig(configPath)
