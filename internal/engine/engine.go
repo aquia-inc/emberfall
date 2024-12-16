@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -10,16 +12,35 @@ func Run(cfg *config) (success bool) {
 		client   *http.Client = &http.Client{}
 		req      *http.Request
 		res      *http.Response
-		err      error
 		failures int
 	)
 
 	for _, test := range cfg.Tests {
+		var err error
 
-		req, err = http.NewRequest(test.Method, test.Url, nil)
+		buf := new(bytes.Buffer)
+
+		switch true {
+		case test.ReqBody.Json != nil && test.ReqBody.Text != nil:
+			test.addError(fmt.Errorf("must declare body.json or body.text but not both"))
+		case test.ReqBody.Json != nil:
+			b, err := json.Marshal(test.ReqBody.Json)
+			if err != nil {
+				test.addError(err)
+			} else {
+				buf = bytes.NewBuffer(b)
+			}
+		}
+
+		req, err = http.NewRequest(test.Method, test.Url, buf)
 
 		if err != nil {
-			fmt.Println(err)
+			test.addError(err)
+		}
+
+		// exit early if test already has errors
+		if len(test.errors) > 0 {
+			test.report()
 			failures++
 			continue
 		}
@@ -41,7 +62,7 @@ func Run(cfg *config) (success bool) {
 			continue
 		}
 
-		if !test.report(res) {
+		if !test.validate(res) {
 			failures++
 		}
 	}
@@ -50,7 +71,7 @@ func Run(cfg *config) (success bool) {
 		success = true
 	}
 
-	fmt.Printf("\n Ran %d tests with %d failures\n", len(cfg.Tests), failures)
+	fmt.Printf("\nRan %d tests with %d failures\n", len(cfg.Tests), failures)
 	return
 }
 
