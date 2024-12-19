@@ -54,7 +54,7 @@ setup() {
 }
 
 @test "SHOULD FAIL with response JSON != request JSON" {
-  run ./emberfall --config ./tests/fail-req-res-json-nomatch.yml
+  run ./emberfall --config ./tests/fail-req-res-json-no-match.yml
   assert_failure
   assert_output --partial 'expected body.json.data.foo == baz got bar'
 }
