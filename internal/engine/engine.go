@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -16,21 +17,31 @@ func Run(cfg *config) (success bool) {
 	)
 
 	for _, test := range cfg.Tests {
-		var err error
+		var (
+			err error
+			b   []byte
+		)
 
 		buf := new(bytes.Buffer)
 
-		switch true {
-		case test.ReqBody.Json != nil && test.ReqBody.Text != nil:
-			test.addError(fmt.Errorf("must declare body.json or body.text but not both"))
-		case test.ReqBody.Json != nil:
-			b, err := json.Marshal(test.ReqBody.Json)
+		if test.ReqBody.Json != nil && test.ReqBody.Text != nil {
+			test.addError(errors.New("may define body.json or body.text but not both"))
+			continue
+		}
+
+		if test.ReqBody.Json != nil {
+			b, err = json.Marshal(test.ReqBody.Json)
 			if err != nil {
 				test.addError(err)
-			} else {
-				buf = bytes.NewBuffer(b)
+				continue
 			}
 		}
+
+		if test.ReqBody.Text != nil {
+			b = []byte(*test.ReqBody.Text)
+		}
+
+		buf = bytes.NewBuffer(b)
 
 		req, err = http.NewRequest(test.Method, test.Url, buf)
 
