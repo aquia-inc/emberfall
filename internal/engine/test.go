@@ -9,14 +9,10 @@ import (
 	"strings"
 )
 
-var (
-	result = map[bool]string{
-		true:  "PASS",
-		false: "FAIL",
-	}
-
-	comp func(prefix string, a, b map[string]interface{})
-)
+var result = map[bool]string{
+	true:  "PASS",
+	false: "FAIL",
+}
 
 type body struct {
 	Json map[string]interface{} `yaml:"json,omitempty"`
@@ -66,27 +62,7 @@ func (t *test) validate(res *http.Response) bool {
 				t.addError(err)
 			} else {
 				// compare returned json to expect.body.json recursively
-
-				comp = func(prefix string, a, b map[string]interface{}) {
-					for k, v := range a {
-						switch av := v.(type) {
-						case map[string]interface{}:
-							switch bv := b[k].(type) {
-							case map[string]interface{}:
-								comp(fmt.Sprintf(prefix+".%s", k), av, bv)
-							default:
-								t.addError(fmt.Errorf("expected %s.%s == %v got %v", prefix, k, v, b[k]))
-							}
-
-						default:
-							if b[k] != v {
-								t.addError(fmt.Errorf("expected %s.%s == %v got %v", prefix, k, v, b[k]))
-							}
-						}
-					}
-				}
-
-				comp("body.json", t.Expect.ResBody.Json, resJson)
+				t.compare("body.json", t.Expect.ResBody.Json, resJson)
 			}
 		}
 	}
@@ -121,6 +97,25 @@ func (t *test) report() {
 	if len(t.errors) > 0 {
 		for _, e := range t.errors {
 			fmt.Printf("  %s\n", e)
+		}
+	}
+}
+
+func (t *test) compare(prefix string, a, b map[string]interface{}) {
+	for k, v := range a {
+		switch av := v.(type) {
+		case map[string]interface{}:
+			switch bv := b[k].(type) {
+			case map[string]interface{}:
+				t.compare(fmt.Sprintf(prefix+".%s", k), av, bv)
+			default:
+				t.addError(fmt.Errorf("expected %s.%s == %v got %v", prefix, k, v, b[k]))
+			}
+
+		default:
+			if b[k] != v {
+				t.addError(fmt.Errorf("expected %s.%s == %v got %v", prefix, k, v, b[k]))
+			}
 		}
 	}
 }
