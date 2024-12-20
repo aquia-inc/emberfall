@@ -1,0 +1,12 @@
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    follow: true
+    body:
+      text: "bar"
+    expect:
+      status: 200
+      body:
+        # postman-echo always returns json
+        json: 
+          data: "bar"
