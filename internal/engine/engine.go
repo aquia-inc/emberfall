@@ -16,11 +16,14 @@ func Run(cfg *config) (success bool) {
 		failures int
 	)
 
+	// TODO: refactor this loop into Tests.run() by making config.Tests type Tests as []*test
 	for _, test := range cfg.Tests {
 		var (
 			err error
 			b   []byte
 		)
+
+		test.bootstrap()
 
 		buf := new(bytes.Buffer)
 
@@ -35,10 +38,17 @@ func Run(cfg *config) (success bool) {
 				test.addError(err)
 				continue
 			}
+
+			if _, ok := test.Headers["Content-Type"]; !ok {
+				test.Headers["Content-Type"] = "application/json"
+			}
 		}
 
 		if test.ReqBody.Text != nil {
 			b = []byte(*test.ReqBody.Text)
+			if _, ok := test.Headers["Content-Type"]; !ok {
+				test.Headers["Content-Type"] = "text/plain"
+			}
 		}
 
 		buf = bytes.NewBuffer(b)

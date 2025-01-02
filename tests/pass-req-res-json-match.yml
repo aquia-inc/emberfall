@@ -1,7 +1,7 @@
+# test that request sends json and body receives json
 tests:
   - url: https://postman-echo.com/post
     method: POST
-    follow: true
     body:
       json:
         foo: "bar"

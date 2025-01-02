@@ -34,6 +34,12 @@ type test struct {
 	pass   bool
 }
 
+func (t *test) bootstrap() {
+	if t.Headers == nil {
+		t.Headers = map[string]string{}
+	}
+}
+
 func (t *test) validate(res *http.Response) bool {
 	var err error
 

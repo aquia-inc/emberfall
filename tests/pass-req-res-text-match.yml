@@ -1,3 +1,4 @@
+# test that request sends text
 tests:
   - url: https://postman-echo.com/post
     method: POST
