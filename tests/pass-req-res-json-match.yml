@@ -1,0 +1,13 @@
+# test that request sends json and body receives json
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      json:
+        foo: "bar"
+    expect:
+      status: 200
+      body:
+        json:
+          data:
+            foo: "bar"
