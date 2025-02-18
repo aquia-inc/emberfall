@@ -1,0 +1,20 @@
+# test that body matches 
+tests:
+  - url: https://postman-echo.com/post
+    id: "foo"
+    method: POST
+    body:
+      json:
+        bar: "baz"
+    expect:
+      status: 200
+      body:
+        json: &fooJson
+          data:
+            bar: "baz"
+  
+  - url: "https://postman-echo.com/{{.foo.Response.data.bar}}"
+    method: GET
+    expect:
+      status: 404
+      

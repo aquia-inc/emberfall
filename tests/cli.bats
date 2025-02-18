@@ -69,3 +69,9 @@ setup() {
   assert_failure
   assert_output --partial 'expected body.json.data == baz got bar'
 }
+
+@test "SHOULD PASS with 404 on interpolated path" {
+  run ./emberfall --config ./tests/pass-test-dependencies.yml
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/baz'
+}
