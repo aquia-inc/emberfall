@@ -9,31 +9,37 @@ import (
 )
 
 func Run(cfg *config) (success bool) {
+	// reduce memory allocations by reusing things that dont need to be cached
 	var (
 		client   *http.Client = &http.Client{}
 		req      *http.Request
-		res      *http.Response
 		failures int
+		reqBuf   *bytes.Buffer = new(bytes.Buffer)
 	)
 
 	// TODO: refactor this loop into Tests.run() by making config.Tests type Tests as []*test
 	for _, test := range cfg.Tests {
 		var (
-			err error
-			b   []byte
+			err  error
+			body []byte
+			res  *http.Response
 		)
 
+		reqBuf.Truncate(0)
 		test.bootstrap()
+		err = interpolate(&test.Url)
+		if err != nil {
+			test.addError(err)
+			continue
+		}
 
-		buf := new(bytes.Buffer)
-
-		if test.ReqBody.Json != nil && test.ReqBody.Text != nil {
+		if test.Body.Json != nil && test.Body.Text != nil {
 			test.addError(errors.New("may define body.json or body.text but not both"))
 			continue
 		}
 
-		if test.ReqBody.Json != nil {
-			b, err = json.Marshal(test.ReqBody.Json)
+		if test.Body.Json != nil {
+			body, err = json.Marshal(test.Body.Json)
 			if err != nil {
 				test.addError(err)
 				continue
@@ -44,16 +50,16 @@ func Run(cfg *config) (success bool) {
 			}
 		}
 
-		if test.ReqBody.Text != nil {
-			b = []byte(*test.ReqBody.Text)
+		if test.Body.Text != nil {
+			body = []byte(*test.Body.Text)
 			if _, ok := test.Headers["Content-Type"]; !ok {
 				test.Headers["Content-Type"] = "text/plain"
 			}
 		}
 
-		buf = bytes.NewBuffer(b)
+		reqBuf.Write(body)
 
-		req, err = http.NewRequest(test.Method, test.Url, buf)
+		req, err = http.NewRequest(test.Method, test.Url, reqBuf)
 
 		if err != nil {
 			test.addError(err)
@@ -67,6 +73,11 @@ func Run(cfg *config) (success bool) {
 		}
 
 		for k, v := range test.Headers {
+			err = interpolate(&v)
+			if err != nil {
+				test.addError(err)
+				continue
+			}
 			req.Header.Set(k, v)
 		}
 
@@ -86,11 +97,9 @@ func Run(cfg *config) (success bool) {
 		if !test.validate(res) {
 			failures++
 		}
-	}
+	} // end for
 
-	if failures == 0 {
-		success = true
-	}
+	success = (failures == 0)
 
 	fmt.Printf("\nRan %d tests with %d failures\n", len(cfg.Tests), failures)
 	return
