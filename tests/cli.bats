@@ -7,7 +7,7 @@ setup() {
 @test "--version should be correct" {
   run ./emberfall --version
   assert_success
-  assert_output "emberfall version 0.2.0"
+  assert_output "emberfall version 0.3.0"
 }
 
 @test "no config SHOULD FAIL" {
