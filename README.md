@@ -14,18 +14,28 @@ The YAML tests config can be provided in two ways:
 - as a file: `emberfall --config path/to/config.yaml`
 - piped to stdin: `echo $EMBERFALL_CONFIG | emberfall --config -` 
 
-Tests are defined in a simple YAML document that defines the following keys:
+Tests are defined in a simple YAML document with the following schema:
 ```yaml
 tests:
-- url: string
-  method: string #a supported HTTP method such as GET, POST, PUT, DELETE, etc...
+- id: string # optional. used to cache the test for referencing in later tests. See Response References below
+  url: string
+  method: string # a supported HTTP method such as GET, POST, PUT, DELETE, etc...
   follow: bool # optional, whether to follow redirects or not, defaults to false
+  headers: object # optional, sets headers to be sent with the request
+    # arbitrary key:value pairs
+  body: object # optional
+    text: string # to send as content-type text/plain
+    json: object # to send as content-type application/json
+      # arbitrary key:value pairs
   expect:
     status: int #a supported HTTP status code such as 200,201,301,400,404, etc...
-    body: string # optional
-    headers: #optional
+    body: object # optional
+      text: string # to compare to the response body as a text string
+      json: object # to compare to the response body as a json object
+    headers: object #optional
       # key:value where header key is expected to be present in the response
 ```
+> **_NOTE:_**  When expecting a JSON response, every key:value pair in the `expect.body.json` object must be present in the response body and of the same type. If the response body contains additional keys, the test will still pass. A future version will allow for a "strict" mode that will fail if the response body does not match the expected body exactly. An additional future release, will allow the use of a JSON schema to validate the response body which will be useful for validating reponses against types when actual values are not known or do not matter.
 
 ### Basic Tests Configuration
 The following example is the minimum configuration required to execute Emberfall tests. This performs a single test against an API endpoint, expecting to receive a 401 unauthorized response:
@@ -36,6 +46,36 @@ tests:
   expect:
     status: 401
     body: "unauthorized"
+```
+
+### Reponse References
+You can reference the response of a previous test in the current test. This is useful for testing endpoints that require a value from a previous response, for example testing that an API can create a resource and then retrieve it with the dynamically generated ID. Take a look at the following example, where the ID of the created user is referenced in the second test to retrieve the user by ID. The `{{.createUser.Response.id}}` syntax is used to reference the ID generated in the first test:
+```yaml
+tests:
+- id: createUser
+  url: http://localhost:3000/api/v1/users
+  method: POST
+  body:
+    json:
+      name: "John Doe"
+  expect:
+    status: 201
+    body:
+      json:
+        name: "John Doe"
+
+  # reference the user ID provided in the previous response
+- url: "http://localhost:3000/api/v1/users/{{.createUser.Response.id}}"
+  method: GET
+  body:
+    json:
+      name: "John Doe"
+  expect:
+    status: 201
+    body:
+      json:
+        name: "John Doe"
+
 ```
 ### Advanced Tests Configuration
 The following highlights ways to leverage YAML anchors for common values between tests. Here we use `commonHeaders` (an arbitrary name) as a YAML anchor to reuse when needed:
@@ -60,7 +100,6 @@ tests:
     status: 200
     headers:
       content-type: "application/json"
-
 ```
 ## Testing locally
 
