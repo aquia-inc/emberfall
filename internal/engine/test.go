@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -127,14 +128,35 @@ func (t *test) compare(prefix string, expect, actual map[string]interface{}) {
 
 	for k, ev := range expect {
 		switch expectedValue := ev.(type) {
-		case map[string]interface{}: // when the expected value is a map
+		// when the expected value is a map
+		case map[string]interface{}:
 			switch actualValue := actual[k].(type) {
-			case map[string]interface{}: // and the actual value is a map, recurse!, recurse!, recurse!
+			// and the actual value is a map
+			case map[string]interface{}:
+				// recurse!, recurse!, recurse!
 				t.compare(fmt.Sprintf(prefix+".%s", k), expectedValue, actualValue)
-			default: // otherwise when the actual value is not a map it can't possible equate
-				t.addError(fmt.Errorf("expected %s.%s == %v got %v", prefix, k, expectedValue, actual[k]))
+			default:
+				// otherwise it can't possible equate
+				t.addError(fmt.Errorf("expected %s.%s == %v+ got %v", prefix, k, expectedValue, actual[k]))
 			}
+
 		// TODO: interpolate string types
+		case float64:
+			actualValue := actual[k].(float64)
+			if expectedValue != actualValue {
+				t.addError(fmt.Errorf("expected %s.%s == %s got %v", prefix, k, strconv.FormatFloat(expectedValue, 'f', -1, 64), actual[k]))
+			}
+
+		// yaml encodes integers to int, json encoides all numbers to float64
+		case int:
+			expectedNum := float64(expectedValue)
+			actualVal := actual[k]
+			actualNum := actualVal.(float64)
+
+			if expectedNum != actualNum {
+				t.addError(fmt.Errorf("expected %s.%s == %d got %v", prefix, k, expectedValue, actual[k]))
+			}
+
 		default: // otherwise values other than maps should be compared directly
 			if ev != actual[k] {
 				t.addError(fmt.Errorf("expected %s.%s == %v got %v", prefix, k, expectedValue, actual[k]))
