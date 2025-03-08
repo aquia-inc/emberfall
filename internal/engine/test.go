@@ -147,7 +147,7 @@ func (t *test) compare(prefix string, expect, actual map[string]interface{}) {
 				t.addError(fmt.Errorf("expected %s.%s == %s got %v", prefix, k, strconv.FormatFloat(expectedValue, 'f', -1, 64), actual[k]))
 			}
 
-		// yaml encodes integers to int, json encoides all numbers to float64
+		// yaml encodes integers to int, json encodes all numbers to float64
 		case int:
 			expectedNum := float64(expectedValue)
 			actualVal := actual[k]
