@@ -1,0 +1,13 @@
+# test that 1.1 == 1
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      json:
+        num: 1.1
+    expect:
+      status: 200
+      body:
+        json:
+          data:
+            num: 1
