@@ -1,0 +1,13 @@
+# test that 2.2 == 3.3
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      json:
+        num: 3.3
+    expect:
+      status: 200
+      body:
+        json:
+          data:
+            num: 2.2

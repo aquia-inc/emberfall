@@ -75,3 +75,45 @@ setup() {
   assert_success
   assert_output --partial 'PASS : GET https://postman-echo.com/baz'
 }
+
+@test "SHOULD PASS float equals float" {
+  run ./emberfall --config ./tests/pass-numbers-float-equals-float.yml
+  assert_success
+}
+
+@test "SHOULD PASS int equals int" {
+  run ./emberfall --config ./tests/pass-numbers-int-equals-int.yml
+  assert_success
+}
+
+@test "SHOULD FAIL int equals int" {
+  run ./emberfall --config ./tests/fail-numbers-int-equals-int.yml
+  assert_failure
+  assert_output --partial 'expected body.json.data.num == 1 got 2'
+}
+
+@test "SHOULD FAIL int equals float" {
+  run ./emberfall --config ./tests/fail-numbers-int-equals-float.yml
+  assert_failure
+  assert_output --partial 'expected body.json.data.num == 1 got 1.1'
+}
+
+@test "SHOULD FAIL float equals float" {
+  run ./emberfall --config ./tests/fail-numbers-float-equals-float.yml
+  assert_failure
+  assert_output --partial 'expected body.json.data.num == 2.2 got 3.3'
+}
+
+
+@test "SHOULD FAIL string equals float" {
+  run ./emberfall --config ./tests/fail-numbers-string-equals-float.yml
+  assert_failure
+  assert_output --partial 'expected body.json.data.num == 1 got 1.1'
+}
+
+
+@test "SHOULD FAIL string equals int" {
+  run ./emberfall --config ./tests/fail-numbers-string-equals-int.yml
+  assert_failure
+  assert_output --partial 'expected body.json.data.num == 1 got 2'
+}
