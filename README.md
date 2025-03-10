@@ -123,11 +123,25 @@ Define tests in a YAML file like show above, and run emberfall: `emberfall --con
 
 ## As a Github Action
 
-```yaml
 
+```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.3.0
+   version: 0.3.1
+   config: # string: YAML tests config inlined
+   file: # string: path/to/tests
+```
+
+> **_NOTE:_** when both `config` and `file` are specified, Emberfall will run _twice_ with `config` running first, and `file` running second.
+
+### Inlined Tests
+
+This is helpful for either short tests or for testing Emberfall integration with your workflow
+
+```yaml
+  uses: "aquia-inc/emberfall@main"
+  with:
+   version: 0.3.1
    config: | 
     ---
     tests:  
@@ -140,4 +154,13 @@ Define tests in a YAML file like show above, and run emberfall: `emberfall --con
             content-type: "text/html; charset=utf-8"
             content-language: en-US
       
+```
+
+### Tests in a file
+For longer tests it's best to place those in their own file like so
+```yaml
+  uses: "aquia-inc/emberfall@main"
+  with:
+   version: 0.3.1
+   file: path/to/tests.yml   
 ```

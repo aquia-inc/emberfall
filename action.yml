@@ -7,8 +7,11 @@ inputs:
     description: "Emberfall version"
     required: true
   config:
-    description: "Emberfall tests config in YAML format"
-    required: true
+    description: "Emberfall tests inlined as string"
+    required: false
+  file:
+    description: "Path to Emberfall tests file"
+    required: false
 runs:
     using: "composite"
     steps:
@@ -40,10 +43,16 @@ runs:
           tar -C /tmp -xzf emberfall.tgz
           rm emberfall.tgz
           sudo mv /tmp/emberfall /usr/bin
-      
-      - name: Start emberfall
+
+      - name: Run Emberfall Tests - Inlined
         shell: bash
+        if: inputs.config != ''
         run: |
           echo "${{ inputs.config }}" > ./emberfallconfig.yml
           emberfall --config ./emberfallconfig.yml
+
+      - name: Run Emberfall Tests - File
+        shell: bash
+        if: inputs.file != ''
+        run: emberfall --config ${{ inputs.file }}
           
