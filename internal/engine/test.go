@@ -39,6 +39,7 @@ type test struct {
 	Response       interface{}
 	errors         []error
 	pass           bool
+	responseBody   []byte
 }
 
 func (t *test) bootstrap() {
@@ -60,12 +61,12 @@ func (t *test) validate(r *http.Response) bool {
 	}
 
 	if t.Expect.Body != nil {
-		body, _ := io.ReadAll(r.Body)
+		t.responseBody, _ = io.ReadAll(r.Body)
 
 		if t.Expect.Body.Text != nil && t.Expect.Body.Json != nil {
 			t.addError(errors.New("cannot expect both body.text and body.json"))
 		} else if t.Expect.Body.Text != nil {
-			s := strings.TrimSpace(string(body))
+			s := strings.TrimSpace(string(t.responseBody))
 			t.Response = &s // make it available for referencing in case the test was cached
 
 			if *t.Expect.Body.Text != s {
@@ -74,7 +75,7 @@ func (t *test) validate(r *http.Response) bool {
 		} else if t.Expect.Body.Json != nil {
 
 			var rj map[string]interface{}
-			err = json.Unmarshal(body, &rj)
+			err = json.Unmarshal(t.responseBody, &rj)
 
 			if err != nil {
 				t.addError(err)
@@ -118,8 +119,12 @@ func (t *test) report() {
 	fmt.Printf("%s : %s %s\n", result[t.pass], t.Method, t.Url)
 	if len(t.errors) > 0 {
 		for _, e := range t.errors {
-			fmt.Printf("  %s\n", e)
+			fmt.Printf("       %s\n", e)
 		}
+		if len(t.responseBody) > 0 {
+			fmt.Printf("       %s\n", string(t.responseBody))
+		}
+		fmt.Println("")
 	}
 }
 

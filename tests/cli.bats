@@ -104,16 +104,20 @@ setup() {
   assert_output --partial 'expected body.json.data.num == 2.2 got 3.3'
 }
 
-
 @test "SHOULD FAIL string equals float" {
   run ./emberfall --config ./tests/fail-numbers-string-equals-float.yml
   assert_failure
   assert_output --partial 'expected body.json.data.num == 1 got 1.1'
 }
 
-
 @test "SHOULD FAIL string equals int" {
   run ./emberfall --config ./tests/fail-numbers-string-equals-int.yml
   assert_failure
   assert_output --partial 'expected body.json.data.num == 1 got 2'
+}
+
+@test "SHOULD FAIL but body response gets printed" {
+  run ./emberfall --config ./tests/fail-response-printed.yml
+  assert_failure
+  assert_output --partial '"status": 400'
 }

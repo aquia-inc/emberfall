@@ -1,0 +1,12 @@
+tests:
+  - url: https://postman-echo.com/status/400
+    method: GET
+    follow: true
+    body:
+      json:
+        foo: "bar"
+    expect:
+      status: 200
+      body:
+        json:
+          status: 200
