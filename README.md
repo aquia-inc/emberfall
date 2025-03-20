@@ -127,7 +127,7 @@ Define tests in a YAML file like show above, and run emberfall: `emberfall --con
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.3.1
+   version: 0.3.2
    config: # string: YAML tests config inlined
    file: # string: path/to/tests
 ```
@@ -141,7 +141,7 @@ This is helpful for either short tests or for testing Emberfall integration with
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.3.1
+   version: 0.3.2
    config: | 
     ---
     tests:  
@@ -161,6 +161,6 @@ For longer tests it's best to place those in their own file like so
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.3.1
+   version: 0.3.2
    file: path/to/tests.yml   
 ```
