@@ -121,3 +121,38 @@ setup() {
   assert_failure
   assert_output --partial '"status": 400'
 }
+
+@test "SHOULD PASS include 200" {
+  run ./emberfall --config ./tests/include-exclude.yml -i '200'
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/200'
+  assert_output --partial 'Ran: 1'
+  assert_output --partial 'Skipped: 3'
+}
+
+@test "SHOULD PASS include starts with 20" {
+  run ./emberfall --config ./tests/include-exclude.yml -i '^20'
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/200'
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/201'
+  assert_output --partial 'Ran: 2'
+  assert_output --partial 'Skipped: 2'
+}
+
+@test "SHOULD PASS exclude starts with redirect" {
+  run ./emberfall --config ./tests/include-exclude.yml -x '^redirect'
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/200'
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/201'
+  assert_output --partial 'Ran: 2'
+  assert_output --partial 'Skipped: 2'
+}
+
+@test "SHOULD PASS include contains redirect" {
+  run ./emberfall --config ./tests/include-exclude.yml -i 'redirect'
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/301'
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/302'
+  assert_output --partial 'Ran: 2'
+  assert_output --partial 'Skipped: 2'
+}
