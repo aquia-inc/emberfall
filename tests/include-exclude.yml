@@ -1,0 +1,20 @@
+tests:
+  - url: https://postman-echo.com/status/200
+    method: GET
+    expect:
+      status: 200
+  
+  - url: https://postman-echo.com/status/201
+    method: GET
+    expect:
+      status: 201
+  
+  - url: https://postman-echo.com/status/301
+    method: GET
+    expect:
+      status: 301
+  
+  - url: https://postman-echo.com/status/302
+    method: GET
+    expect:
+      status: 302

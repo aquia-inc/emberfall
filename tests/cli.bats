@@ -121,3 +121,35 @@ setup() {
   assert_failure
   assert_output --partial '"status": 400'
 }
+
+@test "SHOULD PASS include exactly 200" {
+  run ./emberfall --config ./tests/include-exclude.yml --url 'status/200'
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/200'
+  assert_output --partial 'Ran: 1'
+  assert_output --partial 'Skipped: 3'
+}
+
+@test "SHOULD PASS include all 200 status" {
+  run ./emberfall --config ./tests/include-exclude.yml -u 'status/2\d{2}'
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/200'
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/201'
+  assert_output --partial 'Ran: 2'
+  assert_output --partial 'Skipped: 2'
+}
+
+@test "SHOULD PASS include all but 200" {
+  run ./emberfall --config ./tests/include-exclude.yml -u 'status/[13-5]\d{2}'
+  assert_success
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/301'
+  assert_output --partial 'PASS : GET https://postman-echo.com/status/302'
+  assert_output --partial 'Ran: 2'
+  assert_output --partial 'Skipped: 2'
+}
+
+@test "SHOULD FAIL include invalid regular expression" {
+  run ./emberfall --config ./tests/include-exclude.yml -u '[[200'
+  assert_failure
+  assert_output --partial 'error parsing regexp: missing closing ]: `[[200`'
+}
