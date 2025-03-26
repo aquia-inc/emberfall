@@ -6,16 +6,38 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 )
 
-func Run(cfg *config) (success bool) {
+func Run(cfg *config, include, exclude string) bool {
 	// reduce memory allocations by reusing things that dont need to be cached
 	var (
-		client   *http.Client = &http.Client{}
-		req      *http.Request
-		failures int
-		reqBuf   *bytes.Buffer = new(bytes.Buffer)
+		client               = &http.Client{}
+		req                  *http.Request
+		ran, skipped, failed int
+		reqBuf               = new(bytes.Buffer)
+		included, excluded   *regexp.Regexp
+		err                  error
 	)
+
+	// compile include/exclude strings into regular expressions
+	// return false if either fails
+
+	if exclude != "" {
+		excluded, err = regexp.Compile(exclude)
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+	}
+
+	if include != "" {
+		included, err = regexp.Compile(include)
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+	}
 
 	// TODO: refactor this loop into Tests.run() by making config.Tests type Tests as []*test
 	for _, test := range cfg.Tests {
@@ -27,6 +49,13 @@ func Run(cfg *config) (success bool) {
 
 		reqBuf.Truncate(0)
 		test.bootstrap()
+
+		// filter excluded/included
+		if (excluded != nil && excluded.MatchString(*test.ID)) || (included != nil && !included.MatchString(*test.ID)) {
+			skipped++
+			continue
+		}
+
 		err = interpolate(&test.Url)
 		if err != nil {
 			test.addError(err)
@@ -68,7 +97,7 @@ func Run(cfg *config) (success bool) {
 		// exit early if test already has errors
 		if len(test.errors) > 0 {
 			test.report()
-			failures++
+			failed++
 			continue
 		}
 
@@ -90,19 +119,19 @@ func Run(cfg *config) (success bool) {
 		res, err = client.Do(req)
 		if err != nil {
 			fmt.Println(err)
-			failures++
+			failed++
 			continue
 		}
 
 		if !test.validate(res) {
-			failures++
+			failed++
 		}
+
+		ran++
 	} // end for
 
-	success = (failures == 0)
-
-	fmt.Printf("\nRan %d tests with %d failures\n", len(cfg.Tests), failures)
-	return
+	fmt.Printf("\n    Ran: %d\n Failed: %d\nSkipped: %d\n", ran, failed, skipped)
+	return (failed == 0)
 }
 
 func noRedirect(req *http.Request, via []*http.Request) error {
