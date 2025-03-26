@@ -156,3 +156,9 @@ setup() {
   assert_output --partial 'Ran: 2'
   assert_output --partial 'Skipped: 2'
 }
+
+@test "SHOULD FAIL include invalid regular expression" {
+  run ./emberfall --config ./tests/include-exclude.yml -i '[[redirect'
+  assert_failure
+  assert_output --partial 'error parsing regexp: missing closing ]: `[[redirect`'
+}
