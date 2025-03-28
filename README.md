@@ -5,8 +5,22 @@
 
 **HTTP smoke testing made easy.**
 
-Simply declare a list of URLs and their expected response values, and Emberfall will test, compare, and report which URLs fail along with details of what expectations were not met. Tests are merely a list of request objects, each with a url, method, headers to be sent, and an expects field. With the `expects` field you can define the status code, body contents (as a string), and any headers (as strings) that should be present in the response. If anything expected is not present or not equal to the defined value `emberfall` will exit with a non-zero code.
+Simply declare a list of URLs along with their expected response values, and Emberfall will test, compare, and report which URLs fail along with details of what expectations were not met.
 
+## CLI Usage
+```sh
+emberfall [flags]
+
+Flags:
+  -c, --config string    Path to config file. - to read from stdin (default "-")
+  -x, --exclude string   Regular expression to exclude tests matching id
+  -h, --help             help for emberfall
+  -i, --include string   Regular expression to include tests matching id
+  -v, --version          version for emberfall
+```
+When using `--include` or `--exclude`, the value provided to each flag will be compiled as a Go-compatible regular expression and used to match against the `id` field for each test. To define multiple tests use the pipe symbol (|), for example to include foo, bar, and baz use `-i 'foo|bar|baz'`. To include all tests that start with 'ba' us `-i '$ba'`. To include all tests that start with "ba" us `-i '^ba'` (be sure to use single quotes to avoid shell expansion)
+
+> **_NOTE:_** When passing both `--include` and `--exclude` flags, only tests that match include and do not match exclude will be ran.
 
 ## Configuring Tests
 
@@ -17,7 +31,7 @@ The YAML tests config can be provided in two ways:
 Tests are defined in a simple YAML document with the following schema:
 ```yaml
 tests:
-- id: string # optional. used to cache the test for referencing in later tests. See Response References below
+- id: string # required only for include/exclude and referencing
   url: string
   method: string # a supported HTTP method such as GET, POST, PUT, DELETE, etc...
   follow: bool # optional, whether to follow redirects or not, defaults to false
@@ -28,12 +42,13 @@ tests:
     json: object # to send as content-type application/json
       # arbitrary key:value pairs
   expect:
-    status: int #a supported HTTP status code such as 200,201,301,400,404, etc...
+    status: int # a supported HTTP status code such as 200,201,301,400,404, etc...
     body: object # optional
       text: string # to compare to the response body as a text string
       json: object # to compare to the response body as a json object
-    headers: object #optional
-      # key:value where header key is expected to be present in the response
+        # arbitrary key:value pairs
+    headers: object # optional, headers expected to be present in the response
+      # key:value pairs 
 ```
 > **_NOTE:_**  When expecting a JSON response, every key:value pair in the `expect.body.json` object must be present in the response body and of the same type. If the response body contains additional keys, the test will still pass. A future version will allow for a "strict" mode that will fail if the response body does not match the expected body exactly. An additional future release, will allow the use of a JSON schema to validate the response body which will be useful for validating reponses against types when actual values are not known or do not matter.
 
