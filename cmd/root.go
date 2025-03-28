@@ -72,5 +72,4 @@ func init() {
 	flags := rootCmd.Flags()
 	flags.StringVarP(&configPath, "config", "c", "-", "Path to config file. - to read from stdin")
 	flags.StringVarP(&urlPattern, "url", "u", "", "Regular expression to include only tests with a matching url")
-	flags.StringVarP(&urlPattern, "method", "m", "", "Regular expression to include only tests with a matching method")
 }
