@@ -9,30 +9,20 @@ import (
 	"regexp"
 )
 
-func Run(cfg *config, include, exclude string) bool {
-	// reduce memory allocations by reusing things that dont need to be cached
+// TODO: refactor to put all passed flag values into a single struct
+func Run(cfg *config, urlPattern string) bool {
+	// reduce memory allocations by reusing as many
 	var (
 		client               = &http.Client{}
 		req                  *http.Request
 		ran, skipped, failed int
 		reqBuf               = new(bytes.Buffer)
-		included, excluded   *regexp.Regexp
+		includedURLs         *regexp.Regexp
 		err                  error
 	)
 
-	// compile include/exclude strings into regular expressions
-	// return false if either fails
-
-	if exclude != "" {
-		excluded, err = regexp.Compile(exclude)
-		if err != nil {
-			fmt.Println(err)
-			return false
-		}
-	}
-
-	if include != "" {
-		included, err = regexp.Compile(include)
+	if urlPattern != "" {
+		includedURLs, err = regexp.Compile(urlPattern)
 		if err != nil {
 			fmt.Println(err)
 			return false
@@ -51,7 +41,8 @@ func Run(cfg *config, include, exclude string) bool {
 		test.bootstrap()
 
 		// filter excluded/included
-		if (excluded != nil && excluded.MatchString(*test.ID)) || (included != nil && !included.MatchString(*test.ID)) {
+
+		if includedURLs != nil && !includedURLs.MatchString(test.Url) {
 			skipped++
 			continue
 		}

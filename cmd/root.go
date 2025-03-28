@@ -15,8 +15,7 @@ import (
 
 var (
 	configPath string
-	include    string
-	exclude    string
+	urlPattern string
 )
 
 var rootCmd = &cobra.Command{
@@ -45,16 +44,6 @@ tests:
         # arbitrary key:value pairs
     headers: object # optional, headers expected to be present in the response
       # key:value pairs 
-
-When using --include or --exclude, the value provided to each flag will be 
-compiled as a Go-compatible regular expression and used to match against the id 
-field for each test. To define multiple tests use the pipe symbol (|), for example
-to include foo, bar, and baz use -i 'foo|bar|baz'. To include all tests 
-that start with 'ba' us -i '$ba'
-
-
-
-When passing both --include and --exclude flags, --exclude will be applied first.
 	`,
 	Version: "0.3.2",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -66,7 +55,7 @@ When passing both --include and --exclude flags, --exclude will be applied first
 			os.Exit(1)
 		}
 
-		if !engine.Run(conf, include, exclude) {
+		if !engine.Run(conf, urlPattern) {
 			os.Exit(2)
 		}
 	},
@@ -82,6 +71,6 @@ func Execute() {
 func init() {
 	flags := rootCmd.Flags()
 	flags.StringVarP(&configPath, "config", "c", "-", "Path to config file. - to read from stdin")
-	flags.StringVarP(&include, "include", "i", "", "Regular expression to include tests matching id")
-	flags.StringVarP(&exclude, "exclude", "x", "", "Regular expression to exclude tests matching id")
+	flags.StringVarP(&urlPattern, "url", "u", "", "Regular expression to include only tests with a matching url")
+	flags.StringVarP(&urlPattern, "method", "m", "", "Regular expression to include only tests with a matching method")
 }
