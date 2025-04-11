@@ -127,7 +127,7 @@ setup() {
   assert_success
   assert_output --partial 'PASS : GET https://postman-echo.com/status/200'
   assert_output --partial 'Ran: 1'
-  assert_output --partial 'Skipped: 3'
+  assert_output --partial 'Skipped: 4'
 }
 
 @test "SHOULD PASS include all 200 status" {
@@ -135,7 +135,7 @@ setup() {
   assert_success
   assert_output --partial 'PASS : GET https://postman-echo.com/status/200'
   assert_output --partial 'PASS : GET https://postman-echo.com/status/201'
-  assert_output --partial 'Ran: 2'
+  assert_output --partial 'Ran: 3'
   assert_output --partial 'Skipped: 2'
 }
 
@@ -145,11 +145,19 @@ setup() {
   assert_output --partial 'PASS : GET https://postman-echo.com/status/301'
   assert_output --partial 'PASS : GET https://postman-echo.com/status/302'
   assert_output --partial 'Ran: 2'
-  assert_output --partial 'Skipped: 2'
+  assert_output --partial 'Skipped: 3'
 }
 
 @test "SHOULD FAIL include invalid regular expression" {
   run ./emberfall --config ./tests/include-exclude.yml -u '[[200'
   assert_failure
   assert_output --partial 'error parsing regexp: missing closing ]: `[[200`'
+}
+
+@test "SHOULD PASS include method POST" {
+  run ./emberfall --config ./tests/include-exclude.yml -m 'POST'
+  assert_success
+  assert_output --partial "PASS : POST https://postman-echo.com/status/201"
+  assert_output --partial "Ran: 1"
+  assert_output --partial "Skipped: 4"
 }
