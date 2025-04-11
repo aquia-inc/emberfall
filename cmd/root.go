@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	configPath    string
-	urlPattern    string
-	methodPattern string
+	configPath string
+	urlPattern string
 )
 
 var rootCmd = &cobra.Command{
@@ -56,7 +55,7 @@ tests:
 			os.Exit(1)
 		}
 
-		if !engine.Run(conf, urlPattern, methodPattern) {
+		if !engine.Run(conf, urlPattern) {
 			os.Exit(2)
 		}
 	},
@@ -73,5 +72,4 @@ func init() {
 	flags := rootCmd.Flags()
 	flags.StringVarP(&configPath, "config", "c", "-", "Path to config file. - to read from stdin")
 	flags.StringVarP(&urlPattern, "url", "u", "", "Regular expression to include only tests with a matching url")
-	flags.StringVarP(&methodPattern, "method", "m", "", "Regular expression to include only tests with a matching method")
 }

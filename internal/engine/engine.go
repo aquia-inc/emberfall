@@ -10,7 +10,7 @@ import (
 )
 
 // TODO: refactor to put all passed flag values into a single struct
-func Run(cfg *config, urlPattern, methodPattern string) bool {
+func Run(cfg *config, urlPattern string) bool {
 	// reduce memory allocations by reusing as many
 	var (
 		client               = &http.Client{}
@@ -18,20 +18,11 @@ func Run(cfg *config, urlPattern, methodPattern string) bool {
 		ran, skipped, failed int
 		reqBuf               = new(bytes.Buffer)
 		includedURLs         *regexp.Regexp
-		includedMethods      *regexp.Regexp
 		err                  error
 	)
 
 	if urlPattern != "" {
 		includedURLs, err = regexp.Compile(urlPattern)
-		if err != nil {
-			fmt.Println(err)
-			return false
-		}
-	}
-
-	if methodPattern != "" {
-		includedMethods, err = regexp.Compile(methodPattern)
 		if err != nil {
 			fmt.Println(err)
 			return false
@@ -52,11 +43,6 @@ func Run(cfg *config, urlPattern, methodPattern string) bool {
 		// filter excluded/included
 
 		if includedURLs != nil && !includedURLs.MatchString(test.Url) {
-			skipped++
-			continue
-		}
-
-		if includedMethods != nil && !includedMethods.MatchString(test.Method) { // '^P'
 			skipped++
 			continue
 		}

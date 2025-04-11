@@ -9,11 +9,6 @@ tests:
     expect:
       status: 201
   
-  - url: https://postman-echo.com/status/201
-    method: POST
-    expect:
-      status: 404
-  
   - url: https://postman-echo.com/status/301
     method: GET
     expect:
