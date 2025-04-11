@@ -153,3 +153,10 @@ setup() {
   assert_failure
   assert_output --partial 'error parsing regexp: missing closing ]: `[[200`'
 }
+
+@test "SHOULD PASS include method POST" {
+  run ./emberfall --config ./tests/include-exclude.yml -m 'POST'
+  assert_success
+  assert_output --partial "PASS : POST https://postman-echo.com/status/201"
+  assert_output --partial "Skipped: 4"
+}
