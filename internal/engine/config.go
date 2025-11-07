@@ -9,40 +9,38 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type config struct {
-	Tests []*test `yaml:"tests"`
+type Config struct {
+	TestsPath, UrlPattern, MethodPattern string
+	Tests                                []*test `yaml:"tests"`
 }
 
-func LoadConfig(configPath string) (*config, error) {
+func (c *Config) LoadTests() error {
 	var (
 		b   []byte
 		err error
 	)
 
-	fmt.Printf("Reading config from %s\n", configPath)
+	fmt.Printf("Reading config from %s\n", c.TestsPath)
 	var stat fs.FileInfo
 
-	if configPath == "-" {
+	if c.TestsPath == "-" {
 		stat, err = os.Stdin.Stat()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if stat.Size() < 1 {
-			return nil, fmt.Errorf("no config provided")
+			return fmt.Errorf("no config provided")
 		}
 
 		b, err = io.ReadAll(os.Stdin)
 	} else {
-		b, err = os.ReadFile(configPath)
+		b, err = os.ReadFile(c.TestsPath)
 	}
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	conf := &config{}
-	err = yaml.Unmarshal(b, conf)
-
-	return conf, err
+	return yaml.Unmarshal(b, c)
 }
