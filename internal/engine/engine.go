@@ -9,8 +9,7 @@ import (
 	"regexp"
 )
 
-// TODO: refactor to put all passed flag values into a single struct
-func Run(cfg *config, urlPattern, methodPattern string) bool {
+func Run(cfg *Config) error {
 	// reduce memory allocations by reusing as many
 	var (
 		client               = &http.Client{}
@@ -22,19 +21,22 @@ func Run(cfg *config, urlPattern, methodPattern string) bool {
 		err                  error
 	)
 
-	if urlPattern != "" {
-		includedURLs, err = regexp.Compile(urlPattern)
+	err = cfg.LoadTests()
+	if err != nil {
+		return err
+	}
+
+	if cfg.UrlPattern != "" {
+		includedURLs, err = regexp.Compile(cfg.UrlPattern)
 		if err != nil {
-			fmt.Println(err)
-			return false
+			return err
 		}
 	}
 
-	if methodPattern != "" {
-		includedMethods, err = regexp.Compile(methodPattern)
+	if cfg.MethodPattern != "" {
+		includedMethods, err = regexp.Compile(cfg.MethodPattern)
 		if err != nil {
-			fmt.Println(err)
-			return false
+			return err
 		}
 	}
 
@@ -136,7 +138,12 @@ func Run(cfg *config, urlPattern, methodPattern string) bool {
 	} // end for
 
 	fmt.Printf("\n    Ran: %d\n Failed: %d\nSkipped: %d\n", ran, failed, skipped)
-	return (failed == 0)
+
+	if failed > 0 {
+		return errors.New("tests failed")
+	}
+
+	return nil
 }
 
 func noRedirect(req *http.Request, via []*http.Request) error {

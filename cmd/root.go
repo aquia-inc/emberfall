@@ -5,19 +5,13 @@ www.aquia.us
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"strings"
 
 	"github.com/aquia-inc/emberfall/internal/engine"
 	"github.com/spf13/cobra"
 )
 
-var (
-	configPath    string
-	urlPattern    string
-	methodPattern string
-)
+var config *engine.Config
 
 var rootCmd = &cobra.Command{
 	Use:   "emberfall",
@@ -47,18 +41,8 @@ tests:
       # key:value pairs 
 	`,
 	Version: "0.3.2",
-	Run: func(cmd *cobra.Command, args []string) {
-
-		configPath = strings.TrimSpace(configPath)
-		conf, err := engine.LoadConfig(configPath)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		if !engine.Run(conf, urlPattern, methodPattern) {
-			os.Exit(2)
-		}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return engine.Run(config)
 	},
 }
 
@@ -70,8 +54,9 @@ func Execute() {
 }
 
 func init() {
+	config = &engine.Config{}
 	flags := rootCmd.Flags()
-	flags.StringVarP(&configPath, "config", "c", "-", "Path to config file. - to read from stdin")
-	flags.StringVarP(&urlPattern, "url", "u", "", "Regular expression to include only tests with a matching url")
-	flags.StringVarP(&methodPattern, "method", "m", "", "Regular expression to include only tests with a matching method")
+	flags.StringVarP(&config.TestsPath, "tests", "t", "-", "Path to tests configuration file. - to read from stdin")
+	flags.StringVarP(&config.UrlPattern, "url", "u", "", "Regular expression to include only tests with a matching url")
+	flags.StringVarP(&config.MethodPattern, "method", "m", "", "Regular expression to include only tests with a matching method")
 }
