@@ -40,7 +40,7 @@ tests:
     headers: object # optional, headers expected to be present in the response
       # key:value pairs 
 	`,
-	Version: "0.3.2",
+	Version: "0.4.0",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return engine.Run(config)
 	},

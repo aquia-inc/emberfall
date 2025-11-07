@@ -7,7 +7,7 @@ setup() {
 @test "--version should be correct" {
   run ./emberfall --version
   assert_success
-  assert_output "emberfall version 0.3.2"
+  assert_output "emberfall version 0.4.0"
 }
 
 @test "no config SHOULD FAIL" {
@@ -119,7 +119,7 @@ setup() {
 @test "SHOULD FAIL but body response gets printed" {
   run ./emberfall --tests ./tests/fail-response-printed.yml
   assert_failure
-  assert_output --partial '"status": 400'
+  assert_output --partial '"status":400'
 }
 
 @test "SHOULD PASS include exactly 200" {

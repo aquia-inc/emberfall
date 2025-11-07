@@ -12,7 +12,7 @@ Simply declare a list of URLs along with their expected response values, and Emb
 emberfall [flags]
 
 Flags:
-  -c, --config string   Path to config file. - to read from stdin (default "-")
+  -c, --tests string    Path to tests config file. - to read from stdin (default "-")
   -h, --help            help for emberfall
   -u, --url string      Regular expression to include only tests with a matching url
   -v, --version         version for emberfall
@@ -22,8 +22,8 @@ Flags:
 ## Configuring Tests
 
 The YAML tests config can be provided in two ways:
-- as a file: `emberfall --config path/to/config.yaml`
-- piped to stdin: `echo $EMBERFALL_CONFIG | emberfall --config -` 
+- as a file: `emberfall --tests path/to/config.yaml`
+- piped to stdin: `echo $EMBERFALL_CONFIG | emberfall --tests -` 
 
 Tests are defined in a simple YAML document with the following schema:
 ```yaml
@@ -131,7 +131,7 @@ go install ./...
 
 ### Running Tests
 
-Define tests in a YAML file like show above, and run emberfall: `emberfall --config path/to/config.yaml`
+Define tests in a YAML file like show above, and run emberfall: `emberfall --tests path/to/config.yaml`
 
 ## As a Github Action
 
@@ -139,7 +139,7 @@ Define tests in a YAML file like show above, and run emberfall: `emberfall --con
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.3.2
+   version: 0.4.0
    config: # string: YAML tests config inlined
    file: # string: path/to/tests
 ```
@@ -153,7 +153,7 @@ This is helpful for either short tests or for testing Emberfall integration with
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.3.2
+   version: 0.4.0
    config: | 
     ---
     tests:  
@@ -173,6 +173,6 @@ For longer tests it's best to place those in their own file like so
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.3.2
+   version: 0.4.0
    file: path/to/tests.yml   
 ```
