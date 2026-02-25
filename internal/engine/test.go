@@ -159,9 +159,13 @@ func (t *test) compareValues(path string, expected, actual interface{}) {
 		}
 		if len(ev) != len(av) {
 			t.addError(fmt.Errorf("expected %s to have %d elements, got %d", path, len(ev), len(av)))
-			return
 		}
-		for i := range ev {
+		// compare overlapping elements even on length mismatch so all errors surface
+		limit := len(ev)
+		if len(av) < limit {
+			limit = len(av)
+		}
+		for i := 0; i < limit; i++ {
 			t.compareValues(fmt.Sprintf("%s[%d]", path, i), ev[i], av[i])
 		}
 
@@ -175,7 +179,8 @@ func (t *test) compareValues(path string, expected, actual interface{}) {
 			t.addError(fmt.Errorf("expected %s == %s got %v", path, strconv.FormatFloat(ev, 'f', -1, 64), actual))
 		}
 
-	// yaml encodes integers to int, json encodes all numbers to float64
+	// yaml encodes integers to int, json encodes all numbers to float64.
+	// note: integers exceeding 2^53 may lose precision due to float64 conversion.
 	case int:
 		av, ok := actual.(float64)
 		if !ok {
@@ -186,6 +191,8 @@ func (t *test) compareValues(path string, expected, actual interface{}) {
 			t.addError(fmt.Errorf("expected %s == %d got %v", path, ev, actual))
 		}
 
+	// default handles string, bool, and nil — all comparable with ==.
+	// maps and slices are handled by earlier cases and should never reach here.
 	default:
 		if expected != actual {
 			t.addError(fmt.Errorf("expected %s == %v got %v", path, expected, actual))
