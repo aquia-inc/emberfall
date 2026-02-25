@@ -161,3 +161,21 @@ setup() {
   assert_output --partial "Ran: 1"
   assert_output --partial "Skipped: 4"
 }
+
+@test "SHOULD PASS with matching JSON arrays" {
+  run ./emberfall --tests ./tests/pass-array-match.yml
+  assert_success
+  assert_output --partial 'PASS'
+}
+
+@test "SHOULD FAIL with mismatched JSON array element" {
+  run ./emberfall --tests ./tests/fail-array-mismatch.yml
+  assert_failure
+  assert_output --partial 'expected body.json.data.items[1].name == WRONG got beta'
+}
+
+@test "SHOULD FAIL with JSON array length mismatch" {
+  run ./emberfall --tests ./tests/fail-array-length-mismatch.yml
+  assert_failure
+  assert_output --partial 'expected body.json.data.items to have 1 elements, got 2'
+}
