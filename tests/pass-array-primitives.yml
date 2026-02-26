@@ -1,0 +1,18 @@
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      json:
+        tags:
+          - "alpha"
+          - "beta"
+          - "gamma"
+    expect:
+      status: 200
+      body:
+        json:
+          data:
+            tags:
+              - "alpha"
+              - "beta"
+              - "gamma"

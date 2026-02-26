@@ -128,44 +128,74 @@ func (t *test) report() {
 	}
 }
 
-// compare recursively compares values through the provided maps
+// compare iterates expected map keys and delegates value comparison to compareValues
 func (t *test) compare(prefix string, expect, actual map[string]interface{}) {
-
 	for k, ev := range expect {
-		switch expectedValue := ev.(type) {
-		// when the expected value is a map
-		case map[string]interface{}:
-			switch actualValue := actual[k].(type) {
-			// and the actual value is a map
-			case map[string]interface{}:
-				// recurse!, recurse!, recurse!
-				t.compare(fmt.Sprintf(prefix+".%s", k), expectedValue, actualValue)
-			default:
-				// otherwise it can't possible equate
-				t.addError(fmt.Errorf("expected %s.%s == %v+ got %v", prefix, k, expectedValue, actual[k]))
-			}
+		av, ok := actual[k]
+		if !ok {
+			t.addError(fmt.Errorf("expected %s.%s to exist but key was missing", prefix, k))
+			continue
+		}
+		t.compareValues(fmt.Sprintf("%s.%s", prefix, k), ev, av)
+	}
+}
 
-		// TODO: interpolate string types
-		case float64:
-			actualValue := actual[k].(float64)
-			if expectedValue != actualValue {
-				t.addError(fmt.Errorf("expected %s.%s == %s got %v", prefix, k, strconv.FormatFloat(expectedValue, 'f', -1, 64), actual[k]))
-			}
+// compareValues recursively compares two values, handling maps, arrays, and primitives
+func (t *test) compareValues(path string, expected, actual interface{}) {
+	switch ev := expected.(type) {
+	case map[string]interface{}:
+		av, ok := actual.(map[string]interface{})
+		if !ok {
+			t.addError(fmt.Errorf("expected %s == %v got %v", path, ev, actual))
+			return
+		}
+		t.compare(path, ev, av)
 
-		// yaml encodes integers to int, json encodes all numbers to float64
-		case int:
-			expectedNum := float64(expectedValue)
-			actualVal := actual[k]
-			actualNum := actualVal.(float64)
+	case []interface{}:
+		av, ok := actual.([]interface{})
+		if !ok {
+			t.addError(fmt.Errorf("expected %s to be an array, got %v", path, actual))
+			return
+		}
+		if len(ev) != len(av) {
+			t.addError(fmt.Errorf("expected %s to have %d elements, got %d", path, len(ev), len(av)))
+		}
+		// compare overlapping elements even on length mismatch so all errors surface
+		limit := len(ev)
+		if len(av) < limit {
+			limit = len(av)
+		}
+		for i := 0; i < limit; i++ {
+			t.compareValues(fmt.Sprintf("%s[%d]", path, i), ev[i], av[i])
+		}
 
-			if expectedNum != actualNum {
-				t.addError(fmt.Errorf("expected %s.%s == %d got %v", prefix, k, expectedValue, actual[k]))
-			}
+	case float64:
+		av, ok := actual.(float64)
+		if !ok {
+			t.addError(fmt.Errorf("expected %s == %s got %v", path, strconv.FormatFloat(ev, 'f', -1, 64), actual))
+			return
+		}
+		if ev != av {
+			t.addError(fmt.Errorf("expected %s == %s got %v", path, strconv.FormatFloat(ev, 'f', -1, 64), actual))
+		}
 
-		default: // otherwise values other than maps should be compared directly
-			if ev != actual[k] {
-				t.addError(fmt.Errorf("expected %s.%s == %v got %v", prefix, k, expectedValue, actual[k]))
-			}
+	// yaml encodes integers to int, json encodes all numbers to float64.
+	// note: integers exceeding 2^53 may lose precision due to float64 conversion.
+	case int:
+		av, ok := actual.(float64)
+		if !ok {
+			t.addError(fmt.Errorf("expected %s == %d got %v", path, ev, actual))
+			return
+		}
+		if float64(ev) != av {
+			t.addError(fmt.Errorf("expected %s == %d got %v", path, ev, actual))
+		}
+
+	// default handles string, bool, and nil — all comparable with ==.
+	// maps and slices are handled by earlier cases and should never reach here.
+	default:
+		if expected != actual {
+			t.addError(fmt.Errorf("expected %s == %v got %v", path, expected, actual))
 		}
 	}
 }
