@@ -5,28 +5,28 @@
 class Emberfall < Formula
   desc "Smoke testing for HTTP services made easy!"
   homepage ""
-  version "0.4.0"
+  version "0.4.1"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.0/emberfall_Darwin_x86_64.tar.gz", using: CurlDownloadStrategy,
+      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.1/emberfall_Darwin_x86_64.tar.gz", using: CurlDownloadStrategy,
         headers: [
           "Accept: application/octet-stream"
         ]
-      sha256 "d05247a6d1306467114550899c2e6bc85b6767d7124f2cdefad113645d7f1787"
+      sha256 "98c7d3c7aa6694eb03daeb1e4624c1600f0cd411e7ac534b3255f70a8579e3d0"
 
-      def install
+      define_method(:install) do
         bin.install "emberfall"
       end
     end
     if Hardware::CPU.arm?
-      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.0/emberfall_Darwin_arm64.tar.gz", using: CurlDownloadStrategy,
+      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.1/emberfall_Darwin_arm64.tar.gz", using: CurlDownloadStrategy,
         headers: [
           "Accept: application/octet-stream"
         ]
-      sha256 "b536234eefe93d9e0eb1e4f830b209101ee8f0a9a5c010f9659f7022fdd98094"
+      sha256 "21a485bdc1aec68d28d8239caa1da5b38c6b93a207bd7bd4c164004746ad72ca"
 
-      def install
+      define_method(:install) do
         bin.install "emberfall"
       end
     end
@@ -34,22 +34,22 @@ class Emberfall < Formula
 
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.0/emberfall_Linux_x86_64.tar.gz", using: CurlDownloadStrategy,
+      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.1/emberfall_Linux_x86_64.tar.gz", using: CurlDownloadStrategy,
         headers: [
           "Accept: application/octet-stream"
         ]
-      sha256 "2999ff3a2052171370c094a7d42ef94db7975f81c08f3848ff602446fd50ddc3"
-      def install
+      sha256 "2acde67b07676a0b786d1663fc05da07c287b4d4b4e41bc9b1579582526f2f25"
+      define_method(:install) do
         bin.install "emberfall"
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.0/emberfall_Linux_arm64.tar.gz", using: CurlDownloadStrategy,
+      url "https://github.com/aquia-inc/emberfall/releases/download/v0.4.1/emberfall_Linux_arm64.tar.gz", using: CurlDownloadStrategy,
         headers: [
           "Accept: application/octet-stream"
         ]
-      sha256 "64ca1a20cfa6dce12c9e687e367179973001873c1a4555036a07d017f0fe5e9b"
-      def install
+      sha256 "885e1a99ba505b33172f1267c7a7fc5ffc96f05b885b881efc534cb6fe82d04b"
+      define_method(:install) do
         bin.install "emberfall"
       end
     end
