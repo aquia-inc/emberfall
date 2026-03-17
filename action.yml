@@ -49,10 +49,10 @@ runs:
         if: inputs.config != ''
         run: |
           echo "${{ inputs.config }}" > ./emberfallconfig.yml
-          emberfall --config ./emberfallconfig.yml
+          emberfall --tests ./emberfallconfig.yml
 
       - name: Run Emberfall Tests - File
         shell: bash
         if: inputs.file != ''
-        run: emberfall --config ${{ inputs.file }}
+        run: emberfall --tests ${{ inputs.file }}
           
