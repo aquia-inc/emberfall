@@ -69,10 +69,22 @@ func Run(cfg *Config) error {
 			continue
 		}
 
-		if test.Body.Json != nil && test.Body.Text != nil {
-			test.addError(errors.New("may define body.json or body.text but not both"))
+		bodyTypes := 0
+		if test.Body.Json != nil {
+			bodyTypes++
+		}
+		if test.Body.Text != nil {
+			bodyTypes++
+		}
+		if test.Body.Multipart != nil {
+			bodyTypes++
+		}
+		if bodyTypes > 1 {
+			test.addError(errors.New("body may define only one of json, text, or multipart"))
 			continue
 		}
+
+		var contentType string
 
 		if test.Body.Json != nil {
 			body, err = json.Marshal(test.Body.Json)
@@ -80,20 +92,27 @@ func Run(cfg *Config) error {
 				test.addError(err)
 				continue
 			}
-
-			if _, ok := test.Headers["Content-Type"]; !ok {
-				test.Headers["Content-Type"] = "application/json"
-			}
+			reqBuf.Write(body)
+			contentType = "application/json"
 		}
 
 		if test.Body.Text != nil {
-			body = []byte(*test.Body.Text)
-			if _, ok := test.Headers["Content-Type"]; !ok {
-				test.Headers["Content-Type"] = "text/plain"
+			reqBuf.WriteString(*test.Body.Text)
+			contentType = "text/plain"
+		}
+
+		if test.Body.Multipart != nil {
+			contentType, err = writeMultipart(reqBuf, test.Body.Multipart)
+			if err != nil {
+				test.addError(err)
 			}
 		}
 
-		reqBuf.Write(body)
+		if contentType != "" {
+			if _, ok := test.Headers["Content-Type"]; !ok {
+				test.Headers["Content-Type"] = contentType
+			}
+		}
 
 		req, err = http.NewRequest(test.Method, test.Url, reqBuf)
 

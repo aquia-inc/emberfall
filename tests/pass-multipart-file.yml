@@ -1,0 +1,16 @@
+# test that multipart/form-data file attachments are sent and echoed back
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      multipart:
+        fields:
+          type: "standard"
+        files:
+          file: ./tests/fixtures/sample.txt
+    expect:
+      status: 200
+      body:
+        json:
+          form:
+            type: "standard"

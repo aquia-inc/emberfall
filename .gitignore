@@ -1,1 +1,12 @@
 dist/
+
+# Compiled binary (built locally for bats tests; release artifacts go in dist/)
+/emberfall
+
+# Local AI assistant context (not committed)
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+.claude/
+.gemini/
+.codex/

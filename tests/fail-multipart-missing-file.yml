@@ -1,0 +1,10 @@
+# test that multipart/form-data with a missing file path fails clearly
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      multipart:
+        files:
+          file: ./tests/fixtures/does-not-exist.pdf
+    expect:
+      status: 200

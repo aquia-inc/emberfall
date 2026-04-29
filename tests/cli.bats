@@ -191,3 +191,23 @@ setup() {
   assert_success
   assert_output --partial 'PASS'
 }
+
+@test "SHOULD PASS with multipart form fields" {
+  run ./emberfall --tests ./tests/pass-multipart-fields.yml
+  assert_success
+  assert_output --partial 'PASS'
+}
+
+@test "SHOULD PASS with multipart file attachment" {
+  run ./emberfall --tests ./tests/pass-multipart-file.yml
+  assert_success
+  assert_output --partial 'PASS'
+}
+
+@test "SHOULD FAIL with multipart referencing missing file" {
+  run ./emberfall --tests ./tests/fail-multipart-missing-file.yml
+  assert_failure
+  assert_output --partial 'FAIL'
+  assert_output --partial 'multipart file'
+  assert_output --partial 'does-not-exist.pdf'
+}

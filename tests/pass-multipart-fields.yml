@@ -1,0 +1,16 @@
+# test that multipart/form-data fields are sent and echoed back
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      multipart:
+        fields:
+          name: "document.pdf"
+          category: "resume"
+    expect:
+      status: 200
+      body:
+        json:
+          form:
+            name: "document.pdf"
+            category: "resume"
