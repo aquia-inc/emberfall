@@ -1,4 +1,8 @@
 # test that multipart/form-data file attachments are sent and echoed back
+#
+# postman-echo keys the `files` map by filename (not the form field name) and
+# returns file content as a base64 data URI. The base64 below decodes to
+# "sample upload\n" (the contents of tests/fixtures/sample.txt).
 tests:
   - url: https://postman-echo.com/post
     method: POST
@@ -14,3 +18,5 @@ tests:
         json:
           form:
             type: "standard"
+          files:
+            sample.txt: "data:application/octet-stream;base64,c2FtcGxlIHVwbG9hZAo="

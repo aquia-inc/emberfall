@@ -211,3 +211,10 @@ setup() {
   assert_output --partial 'multipart file'
   assert_output --partial 'does-not-exist.pdf'
 }
+
+@test "SHOULD FAIL with multipart field name containing CRLF" {
+  run ./emberfall --tests ./tests/fail-multipart-crlf-injection.yml
+  assert_failure
+  assert_output --partial 'FAIL'
+  assert_output --partial 'forbidden control characters'
+}

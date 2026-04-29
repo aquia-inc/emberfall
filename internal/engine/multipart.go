@@ -9,7 +9,13 @@ import (
 	"net/textproto"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// maxMultipartFileSize caps in-memory buffering of any single uploaded file to
+// guard against runaway YAML referencing /dev/urandom, sparse files, or other
+// large inputs that would balloon the request buffer.
+const maxMultipartFileSize = 50 * 1024 * 1024 // 50 MiB
 
 // writeMultipart writes a multipart/form-data payload into buf and returns the
 // Content-Type (including the generated boundary). File parts use a Content-Type
@@ -19,12 +25,18 @@ func writeMultipart(buf *bytes.Buffer, m *multipartBody) (string, error) {
 	w := multipart.NewWriter(buf)
 
 	for k, v := range m.Fields {
+		if err := validatePartName("field", k); err != nil {
+			return "", err
+		}
 		if err := w.WriteField(k, v); err != nil {
 			return "", err
 		}
 	}
 
 	for field, path := range m.Files {
+		if err := validatePartName("file form name", field); err != nil {
+			return "", err
+		}
 		if err := writeFilePart(w, field, path); err != nil {
 			return "", err
 		}
@@ -34,6 +46,15 @@ func writeMultipart(buf *bytes.Buffer, m *multipartBody) (string, error) {
 		return "", err
 	}
 	return w.FormDataContentType(), nil
+}
+
+// validatePartName rejects names that would let a YAML author inject extra
+// MIME headers via CR, LF, or NUL bytes in the part's Content-Disposition.
+func validatePartName(kind, name string) error {
+	if strings.ContainsAny(name, "\r\n\x00") {
+		return fmt.Errorf("multipart %s name contains forbidden control characters: %q", kind, name)
+	}
+	return nil
 }
 
 func writeFilePart(w *multipart.Writer, field, path string) error {
@@ -56,8 +77,14 @@ func writeFilePart(w *multipart.Writer, field, path string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(part, f); err != nil {
+
+	limited := &io.LimitedReader{R: f, N: maxMultipartFileSize + 1}
+	n, err := io.Copy(part, limited)
+	if err != nil {
 		return err
+	}
+	if n > maxMultipartFileSize {
+		return fmt.Errorf("multipart file %q exceeds %d byte limit", path, maxMultipartFileSize)
 	}
 	return nil
 }

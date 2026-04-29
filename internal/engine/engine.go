@@ -43,9 +43,8 @@ func Run(cfg *Config) error {
 	// TODO: refactor this loop into Tests.run() by making config.Tests type Tests as []*test
 	for _, test := range cfg.Tests {
 		var (
-			err  error
-			body []byte
-			res  *http.Response
+			err error
+			res *http.Response
 		)
 
 		reqBuf.Truncate(0)
@@ -87,7 +86,7 @@ func Run(cfg *Config) error {
 		var contentType string
 
 		if test.Body.Json != nil {
-			body, err = json.Marshal(test.Body.Json)
+			body, err := json.Marshal(test.Body.Json)
 			if err != nil {
 				test.addError(err)
 				continue
@@ -102,6 +101,9 @@ func Run(cfg *Config) error {
 		}
 
 		if test.Body.Multipart != nil {
+			// Errors fall through to the post-NewRequest guard (test.errors > 0)
+			// rather than continuing here; the partial buffer is harmless because
+			// no request is sent and Truncate(0) clears it on the next iteration.
 			contentType, err = writeMultipart(reqBuf, test.Body.Multipart)
 			if err != nil {
 				test.addError(err)

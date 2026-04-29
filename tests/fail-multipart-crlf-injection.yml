@@ -1,0 +1,11 @@
+# test that multipart field names containing control characters are rejected
+# before any request is sent, blocking MIME header injection via the YAML.
+tests:
+  - url: https://postman-echo.com/post
+    method: POST
+    body:
+      multipart:
+        fields:
+          "name\r\nX-Injected: evil": "value"
+    expect:
+      status: 200
