@@ -1,7 +1,9 @@
 # test that multipart field names containing control characters are rejected
 # before any request is sent, blocking MIME header injection via the YAML.
+# URL is non-routable on purpose: validation must fail before the network is
+# touched, so this test never depends on external infrastructure.
 tests:
-  - url: https://postman-echo.com/post
+  - url: http://127.0.0.1:0/post
     method: POST
     body:
       multipart:

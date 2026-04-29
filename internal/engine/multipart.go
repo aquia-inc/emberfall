@@ -10,12 +10,23 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
-// maxMultipartFileSize caps in-memory buffering of any single uploaded file to
-// guard against runaway YAML referencing /dev/urandom, sparse files, or other
-// large inputs that would balloon the request buffer.
+// maxMultipartFileSize caps the in-memory buffering of each individual file part
+// so a YAML pointing at /dev/urandom, a sparse file, or any unexpectedly large
+// input cannot balloon the request buffer. The limit is per file, not aggregate
+// across all files in a single test; configurations with many large attachments
+// should still be sized with the operator's available memory in mind.
 const maxMultipartFileSize = 50 * 1024 * 1024 // 50 MiB
+
+// quoteEscaper mirrors the stdlib's mime/multipart.escapeQuotes (which is
+// unexported) so that field and filename values are quoted the same way
+// CreateFormFile would do it. Non-ASCII bytes are passed through as raw UTF-8,
+// which lenient servers parse correctly. Strict RFC 5987 (filename*=UTF-8''...)
+// encoding is not implemented; non-ASCII filenames may not interoperate with
+// servers that reject anything outside the legacy quoted-string form.
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 // writeMultipart writes a multipart/form-data payload into buf and returns the
 // Content-Type (including the generated boundary). File parts use a Content-Type
@@ -48,11 +59,15 @@ func writeMultipart(buf *bytes.Buffer, m *multipartBody) (string, error) {
 	return w.FormDataContentType(), nil
 }
 
-// validatePartName rejects names that would let a YAML author inject extra
-// MIME headers via CR, LF, or NUL bytes in the part's Content-Disposition.
+// validatePartName rejects names containing any control character so a YAML
+// author cannot inject extra MIME headers (via CR/LF/NUL) or produce
+// syntactically invalid Content-Disposition parameters (via other control
+// bytes that bypass the quoted-string escape but still violate RFC 7230).
 func validatePartName(kind, name string) error {
-	if strings.ContainsAny(name, "\r\n\x00") {
-		return fmt.Errorf("multipart %s name contains forbidden control characters: %q", kind, name)
+	for _, r := range name {
+		if unicode.IsControl(r) {
+			return fmt.Errorf("multipart %s name contains forbidden control characters: %q", kind, name)
+		}
 	}
 	return nil
 }
@@ -70,7 +85,9 @@ func writeFilePart(w *multipart.Writer, field, path string) error {
 	}
 
 	h := textproto.MIMEHeader{}
-	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q; filename=%q`, field, filepath.Base(path)))
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+		quoteEscaper.Replace(field),
+		quoteEscaper.Replace(filepath.Base(path))))
 	h.Set("Content-Type", ctype)
 
 	part, err := w.CreatePart(h)
