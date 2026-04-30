@@ -32,6 +32,10 @@ var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 // Content-Type (including the generated boundary). File parts use a Content-Type
 // derived from the file extension, falling back to application/octet-stream.
 // File paths are resolved relative to the process working directory.
+//
+// Part ordering follows Go's randomized map iteration, so fields and files may
+// appear in different orders across runs. Servers that depend on multipart
+// part ordering are not currently supported.
 func writeMultipart(buf *bytes.Buffer, m *multipartBody) (string, error) {
 	w := multipart.NewWriter(buf)
 
@@ -73,6 +77,13 @@ func validatePartName(kind, name string) error {
 }
 
 func writeFilePart(w *multipart.Writer, field, path string) error {
+	if err := validatePartName("file path", path); err != nil {
+		return err
+	}
+	if err := validatePartName("file name", filepath.Base(path)); err != nil {
+		return err
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("multipart file %q: %w", path, err)

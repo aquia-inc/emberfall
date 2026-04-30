@@ -79,8 +79,9 @@ func Run(cfg *Config) error {
 			bodyTypes++
 		}
 		if bodyTypes > 1 {
+			// Falls through to the post-NewRequest guard for reporting; no
+			// request is sent because that guard short-circuits before client.Do.
 			test.addError(errors.New("body may define only one of json, text, or multipart"))
-			continue
 		}
 
 		var contentType string

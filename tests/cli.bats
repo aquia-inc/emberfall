@@ -218,3 +218,17 @@ setup() {
   assert_output --partial 'FAIL'
   assert_output --partial 'forbidden control characters'
 }
+
+@test "SHOULD FAIL with multipart filename containing CRLF" {
+  run ./emberfall --tests ./tests/fail-multipart-filename-crlf.yml
+  assert_failure
+  assert_output --partial 'FAIL'
+  assert_output --partial 'forbidden control characters'
+}
+
+@test "SHOULD FAIL with both multipart and json bodies" {
+  run ./emberfall --tests ./tests/fail-multipart-and-json.yml
+  assert_failure
+  assert_output --partial 'FAIL'
+  assert_output --partial 'body may define only one of json, text, or multipart'
+}
