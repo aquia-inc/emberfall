@@ -18,8 +18,14 @@ var (
 // it is not unmarshaled directly into test{}
 // json tags here for for the encode/decode process used in newTest to convert interface{}
 type body struct {
-	Json map[string]interface{} `yaml:"json,omitempty"`
-	Text *string                `yaml:"text,omitempty"`
+	Json      map[string]interface{} `yaml:"json,omitempty"`
+	Text      *string                `yaml:"text,omitempty"`
+	Multipart *multipartBody         `yaml:"multipart,omitempty"`
+}
+
+type multipartBody struct {
+	Fields map[string]string `yaml:"fields,omitempty"`
+	Files  map[string]string `yaml:"files,omitempty"`
 }
 
 type expect struct {

@@ -43,9 +43,8 @@ func Run(cfg *Config) error {
 	// TODO: refactor this loop into Tests.run() by making config.Tests type Tests as []*test
 	for _, test := range cfg.Tests {
 		var (
-			err  error
-			body []byte
-			res  *http.Response
+			err error
+			res *http.Response
 		)
 
 		reqBuf.Truncate(0)
@@ -69,31 +68,54 @@ func Run(cfg *Config) error {
 			continue
 		}
 
-		if test.Body.Json != nil && test.Body.Text != nil {
-			test.addError(errors.New("may define body.json or body.text but not both"))
-			continue
+		bodyTypes := 0
+		if test.Body.Json != nil {
+			bodyTypes++
+		}
+		if test.Body.Text != nil {
+			bodyTypes++
+		}
+		if test.Body.Multipart != nil {
+			bodyTypes++
+		}
+		if bodyTypes > 1 {
+			// Falls through to the post-NewRequest guard for reporting; no
+			// request is sent because that guard short-circuits before client.Do.
+			test.addError(errors.New("body may define only one of json, text, or multipart"))
 		}
 
+		var contentType string
+
 		if test.Body.Json != nil {
-			body, err = json.Marshal(test.Body.Json)
+			body, err := json.Marshal(test.Body.Json)
 			if err != nil {
 				test.addError(err)
 				continue
 			}
-
-			if _, ok := test.Headers["Content-Type"]; !ok {
-				test.Headers["Content-Type"] = "application/json"
-			}
+			reqBuf.Write(body)
+			contentType = "application/json"
 		}
 
 		if test.Body.Text != nil {
-			body = []byte(*test.Body.Text)
-			if _, ok := test.Headers["Content-Type"]; !ok {
-				test.Headers["Content-Type"] = "text/plain"
+			reqBuf.WriteString(*test.Body.Text)
+			contentType = "text/plain"
+		}
+
+		if test.Body.Multipart != nil {
+			// Errors fall through to the post-NewRequest guard (test.errors > 0)
+			// rather than continuing here; the partial buffer is harmless because
+			// no request is sent and Truncate(0) clears it on the next iteration.
+			contentType, err = writeMultipart(reqBuf, test.Body.Multipart)
+			if err != nil {
+				test.addError(err)
 			}
 		}
 
-		reqBuf.Write(body)
+		if contentType != "" {
+			if _, ok := test.Headers["Content-Type"]; !ok {
+				test.Headers["Content-Type"] = contentType
+			}
+		}
 
 		req, err = http.NewRequest(test.Method, test.Url, reqBuf)
 

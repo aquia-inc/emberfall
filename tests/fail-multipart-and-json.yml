@@ -1,0 +1,13 @@
+# test that the body mutual-exclusion check rejects a request defining both
+# multipart and json bodies; the guard fires before any request is sent.
+tests:
+  - url: http://127.0.0.1:0/post
+    method: POST
+    body:
+      json:
+        foo: "bar"
+      multipart:
+        fields:
+          name: "value"
+    expect:
+      status: 200

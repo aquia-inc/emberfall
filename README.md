@@ -38,6 +38,11 @@ tests:
     text: string # to send as content-type text/plain
     json: object # to send as content-type application/json
       # arbitrary key:value pairs
+    multipart: object # to send as content-type multipart/form-data
+      fields: object # optional, key:value form fields
+      files: object # optional, form-field-name:local-file-path
+        # paths are resolved relative to the working directory; per-file
+        # Content-Type is derived from the file extension
   expect:
     status: int # a supported HTTP status code such as 200,201,301,400,404, etc...
     body: object # optional
@@ -89,6 +94,26 @@ tests:
         name: "John Doe"
 
 ```
+### Multipart Form Uploads
+
+Use `body.multipart` to send `multipart/form-data` requests. `fields` carries plain
+key/value form parts and `files` maps a form field name to a local file path. File
+sizes are capped at 50 MiB per attachment.
+
+```yaml
+tests:
+- url: http://localhost:3000/api/upload
+  method: POST
+  body:
+    multipart:
+      fields:
+        category: "resume"
+      files:
+        file: ./fixtures/resume.pdf
+  expect:
+    status: 202
+```
+
 ### Advanced Tests Configuration
 The following highlights ways to leverage YAML anchors for common values between tests. Here we use `commonHeaders` (an arbitrary name) as a YAML anchor to reuse when needed:
 ```yaml

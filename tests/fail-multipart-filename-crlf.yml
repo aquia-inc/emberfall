@@ -1,0 +1,12 @@
+# test that a file path whose basename contains control characters is
+# rejected before open(), blocking MIME header injection via the filename
+# parameter of Content-Disposition.
+tests:
+  - url: http://127.0.0.1:0/post
+    method: POST
+    body:
+      multipart:
+        files:
+          file: "./fixtures/evil\r\nX-Injected: bad.txt"
+    expect:
+      status: 200

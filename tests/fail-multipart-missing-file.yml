@@ -1,0 +1,12 @@
+# test that multipart/form-data with a missing file path fails clearly.
+# URL is non-routable on purpose: the open() error fires before the network
+# is touched, so this test never depends on external infrastructure.
+tests:
+  - url: http://127.0.0.1:0/post
+    method: POST
+    body:
+      multipart:
+        files:
+          file: ./tests/fixtures/does-not-exist.pdf
+    expect:
+      status: 200
