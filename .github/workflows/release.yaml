@@ -16,11 +16,41 @@ jobs:
         fetch-depth: 0
     
     - uses: actions/setup-go@v5
+
+    - name: Generate release notes
+      run: go run ./cmd/emberfall-release notes --tag "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
     
     - uses: goreleaser/goreleaser-action@v6
       with:
         distribution: goreleaser
-        version: '~> v2'
-        args: release --clean
+        version: v2.17.1
+        args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  enhance-notes:
+    name: Enhance Release Notes
+    needs: compile
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-go@v5
+
+    - name: Enhance release notes
+      continue-on-error: true
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_NOTES_MODEL: ${{ vars.RELEASE_NOTES_MODEL }}
+      run: |
+        if [[ -z "$ANTHROPIC_API_KEY" ]]; then
+          echo "ANTHROPIC_API_KEY is not configured; skipping release-note enhancement."
+          exit 0
+        fi
+        go run ./cmd/emberfall-release enhance-notes --tag "$GITHUB_REF_NAME"

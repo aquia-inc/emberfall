@@ -15,8 +15,11 @@ jobs:
       
       - uses: actions/setup-go@v5
 
+      - name: Test
+        run: go test ./...
+
       - name: Compile
-        run: go build -o ./ ./...
+        run: go build -o ./emberfall .
 
       - id: setup-bats
         uses: bats-core/bats-action@3.0.0
