@@ -78,6 +78,103 @@ We follow a trunk-based development model for our codebase. This means that all 
 
 Please note that pull requests that do not follow the guidelines or are incomplete may be closed without explanation. We appreciate your understanding and cooperation in maintaining a high-quality codebase.
 
+## Automated releases
+
+Emberfall releases are calculated from Conventional Commit messages merged to
+`main`. The release controller considers commits after the latest reachable
+stable tag and applies these rules:
+
+| Commit form | Version change |
+| --- | --- |
+| A `!` breaking marker or a valid `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer | major |
+| `feat` | minor |
+| `fix`, `perf`, `docs`, or `refactor` | patch |
+| `chore`, `test`, `ci`, merge commits, malformed subjects, and other types | no release |
+
+The generated commit `chore(release): bump version to X.Y.Z` is deliberately
+ignored by release analysis. It has no CI-skip marker. This makes a retry after
+the release commit a no-release run unless a later eligible commit exists.
+
+The two synchronized source literals are part of every release: `Version:
+"X.Y.Z"` in `cmd/root.go` and `assert_output "emberfall version X.Y.Z"` in
+`tests/cli.bats`. `CHANGELOG.md` is the canonical changelog. Preparation writes
+the matching release section there before publication; GoReleaser receives that
+same section as its release notes.
+
+### Release controller contract
+
+The repository-local controller has only these commands:
+
+```
+go run ./cmd/emberfall-release plan --json
+go run ./cmd/emberfall-release prepare --github-output PATH
+go run ./cmd/emberfall-release publish --version X.Y.Z
+go run ./cmd/emberfall-release notes --tag vX.Y.Z
+go run ./cmd/emberfall-release enhance-notes --tag vX.Y.Z
+```
+
+`plan --json` reports `releaseNeeded`, `previousVersion`, `version`, `tag`,
+`bump`, and `commits`. `prepare` updates only the two version literals and the
+canonical changelog; it does not create a commit or move a ref. `publish`
+requires that prepared state, creates the generated commit and its `vX.Y.Z`
+tag, and atomically pushes `main` and that tag. `notes` prints the deterministic
+changelog section for a published tag.
+
+`semantic-release.yml` runs for pushes to `main` and manual dispatches. It uses
+full Git history, runs the existing analysis and test gates, then prepares and
+publishes only when the plan needs a release. Configure these GitHub Actions
+secrets for the publishing job:
+
+* `SEMANTIC_RELEASE_APP_ID`
+* `SEMANTIC_RELEASE_APP_PRIVATE_KEY`
+
+The workflow exchanges those credentials for a GitHub App token so checkout
+and the atomic release push use the release bot's explicitly granted repository
+authority instead of a personal credential. GitHub Actions supplies
+`GITHUB_TOKEN` to GoReleaser and the optional notes update, and supplies
+`GITHUB_REPOSITORY` to the release controller; neither needs a separately
+configured secret or variable.
+
+Set the optional `ANTHROPIC_API_KEY` Actions secret to enable post-publication
+release-note enhancement. `RELEASE_NOTES_MODEL` is an optional repository
+variable selecting its model. Enhancement is best effort: any unavailable
+service, invalid response, or other enhancement failure leaves the
+deterministic changelog-derived notes in place and does not replace the release.
+
+GoReleaser is the sole publisher of the GitHub Release, release artifacts,
+checksums, and Homebrew pull request. The controller never duplicates those
+publication responsibilities.
+
+### Recovery after a failed atomic push
+
+Never force-push, move, or replace a remote release tag. Recover a failed atomic
+push with this decision tree:
+
+1. Fetch the current remote state without importing tags:
+
+    ```sh
+    git fetch --prune --no-tags origin
+    ```
+
+2. Compare the peeled local commits from `git rev-parse main^{commit}` and
+   `git rev-parse vX.Y.Z^{commit}` with the fetched `origin/main^{commit}` and
+   the remote tag reported by `git ls-remote origin 'refs/tags/vX.Y.Z'
+   'refs/tags/vX.Y.Z^{}'`. Use the peeled `^{}` value for an annotated tag and
+   the direct value for the lightweight tag produced by the controller.
+3. If remote `main` and the remote tag both resolve to the same intended release
+   commit, publication is complete; make no ref changes.
+4. If remote `main` is still the expected predecessor of the retained local
+   release commit and the remote tag is absent, first verify that local
+   `main^{commit}` equals local `vX.Y.Z^{commit}`. Then publish those exact refs
+   together, without force:
+
+    ```sh
+    git push --atomic origin refs/heads/main:refs/heads/main refs/tags/vX.Y.Z:refs/tags/vX.Y.Z
+    ```
+
+5. If either remote ref exists at any other commit, stop and preserve both
+   remote refs for investigation. Do not retry with force or recreate the tag.
+
 ## Coding Standards
 
 Adhering to a consistent set of coding standards is crucial for maintaining a clean, readable, and maintainable codebase. By following these guidelines, you help ensure that [Project Name] remains a high-quality project that is easy to understand, modify, and extend.
