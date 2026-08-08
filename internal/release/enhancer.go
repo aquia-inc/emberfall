@@ -10,8 +10,13 @@ import (
 // GitHub Release. A failed enhancement returns deterministic notes and never
 // patches the release.
 type ReleaseNotesUpdater struct {
-	Releases *GitHubReleaseClient
+	Releases releaseClient
 	Enhancer Enhancer
+}
+
+type releaseClient interface {
+	ReleaseByTag(context.Context, string) (GitHubRelease, error)
+	UpdateReleaseBody(context.Context, int64, string) error
 }
 
 // EnhanceRelease updates the matching GitHub Release only after enhancement
