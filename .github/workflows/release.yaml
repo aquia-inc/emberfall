@@ -16,6 +16,8 @@ jobs:
         fetch-depth: 0
     
     - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
 
     - name: Generate release notes
       run: go run ./cmd/emberfall-release notes --tag "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
@@ -41,6 +43,8 @@ jobs:
         fetch-depth: 0
 
     - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
 
     - name: Enhance release notes
       continue-on-error: true

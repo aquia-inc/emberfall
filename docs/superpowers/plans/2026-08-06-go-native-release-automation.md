@@ -6,7 +6,7 @@
 
 **Architecture:** A repository-local administrative binary at `cmd/emberfall-release` orchestrates pure release policy, a narrow Git transaction adapter, and optional HTTP clients. GoReleaser remains the sole GitHub Release and Homebrew publisher. Parallel implementation uses isolated worktrees with exclusive file ownership; the integration branch receives only independently reviewed commits.
 
-**Tech Stack:** Go 1.24.1 standard library, Git, GitHub Actions, GoReleaser v2, BATS, Anthropic Messages API, GitHub REST API.
+**Tech Stack:** Go 1.25.0 standard library, Git, GitHub Actions, GoReleaser v2, BATS, Anthropic Messages API, GitHub REST API.
 
 ## Global Constraints
 

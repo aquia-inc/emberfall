@@ -1,6 +1,6 @@
 module github.com/aquia-inc/emberfall
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.61.0

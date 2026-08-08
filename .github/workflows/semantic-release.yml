@@ -44,6 +44,8 @@ jobs:
         run: echo "sha=$(git rev-parse 'HEAD^{commit}')" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: LINT - go
         uses: dominikh/staticcheck-action@v1
@@ -97,6 +99,8 @@ jobs:
         run: test "$(git rev-parse 'HEAD^{commit}')" = "$TESTED_MAIN_SHA"
 
       - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: Create release app token
         id: app-token
