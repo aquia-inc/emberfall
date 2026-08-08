@@ -2,7 +2,10 @@ package release
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -951,6 +954,214 @@ func TestServiceEnhanceNotesBuildsTaggedContextAndUsesUpdater(t *testing.T) {
 	if !strings.Contains(input.Diff, "-before") || !strings.Contains(input.Diff, "+after") {
 		t.Fatalf("enhancement diff = %q, want tagged diff context", input.Diff)
 	}
+}
+
+func TestNewServiceCreatesIndependentProviderHTTPClients(t *testing.T) {
+	service := NewService(t.TempDir(), "origin")
+	updater, err := service.updaterFactory(EnhanceOptions{
+		AnthropicAPIKey:  "anthropic-test-key",
+		GitHubToken:      "github-test-token",
+		GitHubRepository: "acme/emberfall",
+	})
+	if err != nil {
+		t.Fatalf("construct updater: %v", err)
+	}
+	production, ok := updater.(ReleaseNotesUpdater)
+	if !ok {
+		t.Fatalf("updater type = %T, want ReleaseNotesUpdater", updater)
+	}
+	githubClient, ok := production.Releases.(*GitHubReleaseClient)
+	if !ok {
+		t.Fatalf("release client type = %T, want *GitHubReleaseClient", production.Releases)
+	}
+	anthropicEnhancer, ok := production.Enhancer.(*AnthropicEnhancer)
+	if !ok {
+		t.Fatalf("enhancer type = %T, want *AnthropicEnhancer", production.Enhancer)
+	}
+	githubHTTPClient, ok := githubClient.Client.(*http.Client)
+	if !ok {
+		t.Fatalf("github HTTP client type = %T, want *http.Client", githubClient.Client)
+	}
+	anthropicHTTPClient, ok := anthropicEnhancer.Client.(*http.Client)
+	if !ok {
+		t.Fatalf("anthropic HTTP client type = %T, want *http.Client", anthropicEnhancer.Client)
+	}
+	if githubHTTPClient == anthropicHTTPClient {
+		t.Fatal("GitHub and Anthropic adapters share one HTTP client")
+	}
+}
+
+func TestServiceEnhanceNotesUsesRealSDKAdaptersWithoutMutatingDeterministicNotesOnFailure(t *testing.T) {
+	tests := []struct {
+		name              string
+		anthropicStatus   int
+		githubPatchStatus int
+		wantErr           bool
+	}{
+		{name: "success"},
+		{name: "anthropic failure", anthropicStatus: http.StatusServiceUnavailable, wantErr: true},
+		{name: "github update failure", githubPatchStatus: http.StatusUnprocessableEntity, wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository, deterministicNotes := newEnhanceNotesRepository(t)
+			publishedBody := deterministicNotes
+			anthropicRequests := 0
+			patches := 0
+			var patch map[string]any
+
+			anthropic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+				anthropicRequests++
+				if request.Method != http.MethodPost || request.URL.Path != "/v1/messages" {
+					t.Errorf("unexpected Anthropic request: %s %s", request.Method, request.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				if request.Header.Get("x-api-key") != "anthropic-test-key" || request.Header.Get("anthropic-version") != "2023-06-01" {
+					t.Error("Anthropic SDK request did not set the expected authentication headers")
+				}
+				var message struct {
+					Model    string `json:"model"`
+					Messages []struct {
+						Content []struct {
+							Text string `json:"text"`
+						} `json:"content"`
+					} `json:"messages"`
+				}
+				if err := json.NewDecoder(request.Body).Decode(&message); err != nil {
+					t.Fatalf("decode Anthropic SDK message: %v", err)
+				}
+				if message.Model != "claude-test" || len(message.Messages) != 1 || len(message.Messages[0].Content) != 1 || !strings.Contains(message.Messages[0].Content[0].Text, "https://example.test/feature") {
+					t.Error("Anthropic SDK message omitted configured model or deterministic release-note link")
+				}
+				if test.anthropicStatus != 0 {
+					w.WriteHeader(test.anthropicStatus)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(map[string]any{
+					"content": []map[string]string{{
+						"type": "text",
+						"text": "## Curated\n\n- [Feature](https://example.test/feature)",
+					}},
+				}); err != nil {
+					t.Fatalf("encode Anthropic SDK response: %v", err)
+				}
+			}))
+			defer anthropic.Close()
+
+			github := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+				switch request.Method + " " + request.URL.Path {
+				case "GET /repos/acme/emberfall/releases/tags/v0.6.0":
+					w.Header().Set("Content-Type", "application/json")
+					if err := json.NewEncoder(w).Encode(map[string]any{"id": 42, "body": publishedBody}); err != nil {
+						t.Fatalf("encode GitHub release: %v", err)
+					}
+				case "PATCH /repos/acme/emberfall/releases/42":
+					patches++
+					patch = nil
+					if err := json.NewDecoder(request.Body).Decode(&patch); err != nil {
+						t.Fatalf("decode GitHub release update: %v", err)
+					}
+					if test.githubPatchStatus != 0 {
+						w.WriteHeader(test.githubPatchStatus)
+						return
+					}
+					body, ok := patch["body"].(string)
+					if !ok {
+						t.Fatal("GitHub update omitted a string body")
+					}
+					publishedBody = body
+					w.Header().Set("Content-Type", "application/json")
+					if err := json.NewEncoder(w).Encode(map[string]any{"id": 42, "body": body}); err != nil {
+						t.Fatalf("encode GitHub update response: %v", err)
+					}
+				default:
+					t.Errorf("unexpected GitHub request: %s %s", request.Method, request.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer github.Close()
+
+			service := &Service{
+				directory: repository.dir,
+				updaterFactory: func(options EnhanceOptions) (releaseUpdater, error) {
+					anthropicEnhancer := NewAnthropicEnhancer(anthropic.Client(), options.AnthropicAPIKey, options.Model)
+					anthropicEnhancer.Endpoint = anthropic.URL
+					anthropicEnhancer.MaxRetries = 0
+					githubClient := NewGitHubReleaseClient(github.Client(), github.URL, options.GitHubToken, "acme", "emberfall")
+					githubClient.MaxRetries = 0
+					return ReleaseNotesUpdater{Releases: githubClient, Enhancer: anthropicEnhancer}, nil
+				},
+			}
+			err := service.EnhanceNotes(context.Background(), EnhanceOptions{
+				Tag:              "v0.6.0",
+				AnthropicAPIKey:  "anthropic-test-key",
+				Model:            "claude-test",
+				GitHubToken:      "github-test-token",
+				GitHubRepository: "acme/emberfall",
+			})
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("EnhanceNotes succeeded despite provider failure")
+				}
+				if publishedBody != deterministicNotes {
+					t.Fatal("provider failure changed deterministic published notes")
+				}
+				if test.anthropicStatus != 0 && patches != 0 {
+					t.Fatalf("Anthropic failure made %d GitHub PATCH requests, want none", patches)
+				}
+				if test.githubPatchStatus != 0 && patches != 1 {
+					t.Fatalf("GitHub update failure made %d PATCH requests, want one", patches)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("EnhanceNotes: %v", err)
+			}
+			if len(patch) != 1 {
+				t.Fatalf("GitHub patch = %#v, want only body", patch)
+			}
+			if !strings.Contains(publishedBody, notesEnhancementMarker) {
+				t.Fatal("successful enhancement did not publish the idempotence marker")
+			}
+			if !strings.Contains(publishedBody, "\n\n- [Feature]") {
+				t.Fatal("successful enhancement did not publish multiline Markdown")
+			}
+
+			if err := service.EnhanceNotes(context.Background(), EnhanceOptions{
+				Tag:              "v0.6.0",
+				AnthropicAPIKey:  "anthropic-test-key",
+				Model:            "claude-test",
+				GitHubToken:      "github-test-token",
+				GitHubRepository: "acme/emberfall",
+			}); err != nil {
+				t.Fatalf("idempotent EnhanceNotes: %v", err)
+			}
+			if anthropicRequests != 1 || patches != 1 {
+				t.Fatalf("idempotent rerun made Anthropic/PATCH requests %d/%d, want 1/1", anthropicRequests, patches)
+			}
+		})
+	}
+}
+
+func newEnhanceNotesRepository(t *testing.T) (testRepository, string) {
+	t.Helper()
+	repository := newTestRepository(t)
+	repository.write(t, "CHANGELOG.md", "# Changelog\n\n## v0.5.0\n\nOld notes.\n")
+	repository.write(t, "feature.txt", "before\n")
+	repository.git(t, "add", ".")
+	repository.git(t, "commit", "-m", "chore: establish release baseline")
+	repository.git(t, "tag", "v0.5.0")
+
+	deterministicNotes := "## v0.6.0\n\n### Features\n- [Feature](https://example.test/feature)\n"
+	repository.write(t, "CHANGELOG.md", "# Changelog\n\n"+deterministicNotes+"\n## v0.5.0\n\nOld notes.\n")
+	repository.write(t, "feature.txt", "after\n")
+	repository.git(t, "add", ".")
+	repository.git(t, "commit", "-m", "feat: add feature")
+	repository.git(t, "tag", "v0.6.0")
+	return repository, deterministicNotes
 }
 
 func TestServiceEnhanceNotesRejectsMissingConfigurationBeforeDependencies(t *testing.T) {

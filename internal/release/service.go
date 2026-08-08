@@ -86,10 +86,11 @@ func NewService(directory, remote string) *Service {
 			if err != nil {
 				return nil, err
 			}
-			httpClient := &http.Client{Timeout: defaultRequestTimeout}
+			githubHTTPClient := &http.Client{Timeout: defaultRequestTimeout}
+			anthropicHTTPClient := &http.Client{Timeout: defaultRequestTimeout}
 			return ReleaseNotesUpdater{
-				Releases: NewGitHubReleaseClient(httpClient, "", options.GitHubToken, owner, repositoryName),
-				Enhancer: NewAnthropicEnhancer(httpClient, options.AnthropicAPIKey, options.Model),
+				Releases: NewGitHubReleaseClient(githubHTTPClient, "", options.GitHubToken, owner, repositoryName),
+				Enhancer: NewAnthropicEnhancer(anthropicHTTPClient, options.AnthropicAPIKey, options.Model),
 			}, nil
 		},
 	}
