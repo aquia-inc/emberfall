@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -778,18 +777,6 @@ func TestValidateEnhancedNotesRespectsListContentIndentAfterBlankLine(t *testing
 				t.Fatalf("validateEnhancedNotes error = %v, wantErr %t", err, tt.wantErr)
 			}
 		})
-	}
-}
-
-func TestBoundedReadersHandleMaxInt64WithoutOverflow(t *testing.T) {
-	payload, oversize, err := readAllBounded(strings.NewReader("response"), math.MaxInt64)
-	if err != nil || oversize || string(payload) != "response" {
-		t.Fatalf("readAllBounded = %q, %t, %v", payload, oversize, err)
-	}
-	body := &countingReadCloser{remaining: len("response")}
-	oversize, err = drainBounded(body, math.MaxInt64)
-	if err != nil || oversize || body.read != len("response") {
-		t.Fatalf("drainBounded = %t, %v; read = %d", oversize, err, body.read)
 	}
 }
 

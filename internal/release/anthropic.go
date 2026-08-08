@@ -3,12 +3,9 @@ package release
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
-	"io"
-	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -164,46 +161,6 @@ func safeAnthropicError(err error) error {
 		return ErrAnthropicResponseTooLarge
 	}
 	return ErrAnthropicRequest
-}
-
-// The GitHub adapter reuses these bounded read helpers until it is migrated to
-// its SDK in the following release-tooling change.
-func readAllBounded(reader io.Reader, maxBytes int64) ([]byte, bool, error) {
-	payload, err := io.ReadAll(io.LimitReader(reader, boundedReadLimit(maxBytes)))
-	if err != nil {
-		return nil, false, err
-	}
-	if int64(len(payload)) > maxBytes {
-		return payload[:maxBytes], true, nil
-	}
-	return payload, false, nil
-}
-
-func drainBounded(reader io.Reader, maxBytes int64) (bool, error) {
-	written, err := io.Copy(io.Discard, io.LimitReader(reader, boundedReadLimit(maxBytes)))
-	return written > maxBytes, err
-}
-
-func boundedReadLimit(maxBytes int64) int64 {
-	if maxBytes == math.MaxInt64 {
-		return math.MaxInt64
-	}
-	return maxBytes + 1
-}
-
-func decodeStrictJSON(payload []byte, destination any) error {
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	if err := decoder.Decode(destination); err != nil {
-		return err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return errors.New("unexpected trailing JSON value")
-		}
-		return fmt.Errorf("unexpected trailing data: %w", err)
-	}
-	return nil
 }
 
 func enhancementPrompt(input EnhancementInput) string {
