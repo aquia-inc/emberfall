@@ -14,10 +14,13 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
 const (
-	defaultAnthropicEndpoint = "https://api.anthropic.com/v1/messages"
+	defaultAnthropicEndpoint = "https://api.anthropic.com"
 	defaultAnthropicModel    = "claude-sonnet-4-20250514"
 	notesEnhancementMarker   = "<!-- emberfall-claude-notes:v1 -->"
 	maxPromptContextBytes    = 12_000
@@ -25,6 +28,7 @@ const (
 	maxDiffContextBytes      = maxPromptContextBytes - maxCommitContextBytes
 	defaultRequestTimeout    = 30 * time.Second
 	defaultMaxResponseBytes  = int64(1 << 20)
+	maxEnhancementTimeout    = 90 * time.Second
 )
 
 // ErrAnthropicRequest identifies an Anthropic API failure without exposing API
@@ -32,7 +36,7 @@ const (
 var ErrAnthropicRequest = errors.New("anthropic request failed")
 
 // ErrAnthropicResponseTooLarge identifies a response that exceeded the
-// configured byte limit before JSON decoding or error-body draining.
+// configured byte limit before SDK decoding.
 var ErrAnthropicResponseTooLarge = errors.New("anthropic response too large")
 
 // HTTPDoer permits release clients to use a standard-library HTTP client or a
@@ -49,7 +53,7 @@ type AnthropicEnhancer struct {
 	APIKey     string
 	Model      string
 	MaxRetries int
-	// RequestTimeout bounds every attempt, including response-body reads.
+	// RequestTimeout bounds every SDK attempt, including response-body reads.
 	RequestTimeout   time.Duration
 	MaxResponseBytes int64
 }
@@ -89,102 +93,81 @@ func (e *AnthropicEnhancer) Enhance(ctx context.Context, input EnhancementInput)
 		return "", errors.New("anthropic enhancer is not configured")
 	}
 
-	payload, err := json.Marshal(anthropicMessageRequest{
-		Model:     e.Model,
+	operationContext, cancel := context.WithTimeout(ctx, maxEnhancementTimeout)
+	defer cancel()
+
+	client := anthropic.NewClient(
+		option.WithoutEnvironmentDefaults(),
+		option.WithAPIKey(e.APIKey),
+		option.WithBaseURL(e.Endpoint),
+		option.WithHTTPClient(e.sdkHTTPClient()),
+		option.WithMaxRetries(max(0, e.MaxRetries)),
+		option.WithRequestTimeout(e.RequestTimeout),
+	)
+	message, err := client.Messages.New(operationContext, anthropic.MessageNewParams{
+		Model:     anthropic.Model(e.Model),
 		MaxTokens: 1_200,
-		Messages:  []anthropicMessage{{Role: "user", Content: enhancementPrompt(input)}},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(enhancementPrompt(input))),
+		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("encode anthropic request: %w", err)
+		return "", safeAnthropicError(err)
 	}
 
-	attempts := e.MaxRetries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
-	for attempt := 0; attempt < attempts; attempt++ {
-		attemptContext, cancel := context.WithTimeout(ctx, e.RequestTimeout)
-		req, err := http.NewRequestWithContext(attemptContext, http.MethodPost, e.Endpoint, bytes.NewReader(payload))
-		if err != nil {
-			cancel()
-			return "", fmt.Errorf("create anthropic request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("x-api-key", e.APIKey)
-		req.Header.Set("anthropic-version", "2023-06-01")
-
-		response, err := e.Client.Do(req)
-		if err != nil {
-			cancel()
-			return "", fmt.Errorf("anthropic request: %w", err)
-		}
-		text, retry, err := readAnthropicResponse(response, e.MaxResponseBytes)
-		cancel()
-		if err != nil {
-			if retry && attempt+1 < attempts {
-				continue
-			}
-			return "", err
-		}
-		return validateEnhancedNotes(text, input.Notes)
-	}
-	return "", errors.New("anthropic request retries exhausted")
-}
-
-type anthropicMessageRequest struct {
-	Model     string             `json:"model"`
-	MaxTokens int                `json:"max_tokens"`
-	Messages  []anthropicMessage `json:"messages"`
-}
-
-type anthropicMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type anthropicMessageResponse struct {
-	Content []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	} `json:"content"`
-}
-
-func readAnthropicResponse(response *http.Response, maxBytes int64) (string, bool, error) {
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		retry := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= http.StatusInternalServerError
-		oversize, err := drainBounded(response.Body, maxBytes)
-		if err != nil {
-			return "", false, fmt.Errorf("drain anthropic response: %w", err)
-		}
-		if oversize {
-			return "", false, fmt.Errorf("%w: limit %d bytes", ErrAnthropicResponseTooLarge, maxBytes)
-		}
-		return "", retry, fmt.Errorf("%w: status %d", ErrAnthropicRequest, response.StatusCode)
-	}
-	payload, oversize, err := readAllBounded(response.Body, maxBytes)
-	if err != nil {
-		return "", false, fmt.Errorf("read anthropic response: %w", err)
-	}
-	if oversize {
-		return "", false, fmt.Errorf("%w: limit %d bytes", ErrAnthropicResponseTooLarge, maxBytes)
-	}
-	var decoded anthropicMessageResponse
-	if err := decodeStrictJSON(payload, &decoded); err != nil {
-		return "", false, fmt.Errorf("decode anthropic response: %w", err)
-	}
 	var text strings.Builder
-	for _, block := range decoded.Content {
+	for _, block := range message.Content {
 		if block.Type == "text" {
 			text.WriteString(block.Text)
 		}
 	}
 	if strings.TrimSpace(text.String()) == "" {
-		return "", false, errors.New("anthropic response contains no text")
+		return "", errors.New("anthropic response contains no text")
 	}
-	return text.String(), false, nil
+	return validateEnhancedNotes(text.String(), input.Notes)
 }
 
+func (e *AnthropicEnhancer) sdkHTTPClient() HTTPDoer {
+	if client, ok := e.Client.(*http.Client); ok {
+		clone := *client
+		clone.Transport = NewBoundedSDKTransport(clone.Transport, e.MaxResponseBytes)
+		clone.CheckRedirect = func(*http.Request, []*http.Request) error {
+			return errors.New("anthropic redirects are not allowed")
+		}
+		return &clone
+	}
+	transport := NewBoundedSDKTransport(httpDoerTransport{doer: e.Client}, e.MaxResponseBytes)
+	return &http.Client{
+		Transport: transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return errors.New("anthropic redirects are not allowed")
+		},
+	}
+}
+
+type httpDoerTransport struct {
+	doer HTTPDoer
+}
+
+func (t httpDoerTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	return t.doer.Do(request)
+}
+
+func safeAnthropicError(err error) error {
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	if errors.Is(err, ErrSDKResponseTooLarge) {
+		return ErrAnthropicResponseTooLarge
+	}
+	return ErrAnthropicRequest
+}
+
+// The GitHub adapter reuses these bounded read helpers until it is migrated to
+// its SDK in the following release-tooling change.
 func readAllBounded(reader io.Reader, maxBytes int64) ([]byte, bool, error) {
 	payload, err := io.ReadAll(io.LimitReader(reader, boundedReadLimit(maxBytes)))
 	if err != nil {

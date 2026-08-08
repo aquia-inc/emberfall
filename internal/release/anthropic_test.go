@@ -13,16 +13,27 @@ import (
 	"unicode/utf8"
 )
 
-func TestAnthropicEnhancerSendsExpectedRequestAndReturnsValidatedMarkdown(t *testing.T) {
+func TestAnthropicEnhancerIgnoresEnvironmentDefaultsAndReturnsValidatedMarkdown(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
+	t.Setenv("ANTHROPIC_PROFILE", "")
+	t.Setenv("ANTHROPIC_CONFIG_DIR", t.TempDir())
+	t.Setenv("ANTHROPIC_CUSTOM_HEADERS", "X-Environment-Only: leaked")
 	var request struct {
 		Model     string `json:"model"`
 		MaxTokens int    `json:"max_tokens"`
 		Messages  []struct {
 			Role    string `json:"role"`
-			Content string `json:"content"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
 		} `json:"messages"`
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Errorf("path = %q, want /v1/messages", r.URL.Path)
+		}
 		if r.Method != http.MethodPost {
 			t.Errorf("method = %s, want POST", r.Method)
 		}
@@ -35,14 +46,17 @@ func TestAnthropicEnhancerSendsExpectedRequestAndReturnsValidatedMarkdown(t *tes
 		if got := r.Header.Get("Content-Type"); got != "application/json" {
 			t.Errorf("Content-Type = %q", got)
 		}
+		if got := r.Header.Get("X-Environment-Only"); got != "" {
+			t.Errorf("environment-only header leaked: %q", got)
+		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Fatal(err)
 		}
 		if request.Model != "claude-test" || request.MaxTokens != 1_200 || len(request.Messages) != 1 || request.Messages[0].Role != "user" {
 			t.Errorf("unexpected request: %#v", request)
 		}
-		if !strings.Contains(request.Messages[0].Content, "[PR 9](https://example.test/pr/9)") {
-			t.Errorf("prompt omitted deterministic notes: %q", request.Messages[0].Content)
+		if len(request.Messages[0].Content) != 1 || request.Messages[0].Content[0].Type != "text" || !strings.Contains(request.Messages[0].Content[0].Text, "[PR 9](https://example.test/pr/9)") {
+			t.Errorf("prompt omitted deterministic notes: %#v", request.Messages[0].Content)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"## Highlights\n\n[PR 9](https://example.test/pr/9)"}]}`))
@@ -62,7 +76,8 @@ func TestAnthropicEnhancerSendsExpectedRequestAndReturnsValidatedMarkdown(t *tes
 
 func TestAnthropicEnhancerConcatenatesAllTextBlocksInOrder(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"# Curated"},{"type":"text","text":"\n\n"},{"type":"tool_use","text":"ignored"},{"type":"text","text":"[Issue](https://example.test/issues/4)"}]}`))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"# Curated"},{"type":"text","text":"\n\n"},{"type":"tool_use","id":"toolu_1","name":"ignored","input":{}},{"type":"text","text":"[Issue](https://example.test/issues/4)"}]}`))
 	}))
 	defer server.Close()
 	enhancer := NewAnthropicEnhancer(server.Client(), "test-key", "claude-test")
@@ -119,20 +134,24 @@ func TestAnthropicEnhancerRejectsOversizeResponses(t *testing.T) {
 }
 
 func TestAnthropicEnhancerBoundsErrorResponseDrain(t *testing.T) {
-	body := &countingReadCloser{remaining: 1_000}
+	bodies := make([]*countingReadCloser, 0, 3)
 	attempts := 0
 	enhancer := NewAnthropicEnhancer(roundTripperFunc(func(*http.Request) (*http.Response, error) {
 		attempts++
+		body := &countingReadCloser{remaining: 1_000}
+		bodies = append(bodies, body)
 		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: body}, nil
 	}), "test-key", "claude-test")
 	enhancer.MaxResponseBytes = 32
 	enhancer.MaxRetries = 2
 	_, err := enhancer.Enhance(context.Background(), EnhancementInput{Notes: "# Deterministic"})
-	if !errors.Is(err, ErrAnthropicResponseTooLarge) || attempts != 1 {
+	if !errors.Is(err, ErrAnthropicResponseTooLarge) || attempts != 3 {
 		t.Fatalf("Enhance error/attempts = %v/%d", err, attempts)
 	}
-	if body.read > 33 || !body.closed {
-		t.Fatalf("error body read/closed = %d/%t, want at most 33/true", body.read, body.closed)
+	for index, body := range bodies {
+		if body.read > 33 || !body.closed {
+			t.Fatalf("attempt %d error body read/closed = %d/%t, want at most 33/true", index+1, body.read, body.closed)
+		}
 	}
 }
 
@@ -151,6 +170,18 @@ func TestAnthropicEnhancerHonorsEarlierCallerDeadline(t *testing.T) {
 	}
 }
 
+func TestAnthropicEnhancerClassifiesCallerCancellation(t *testing.T) {
+	enhancer := NewAnthropicEnhancer(roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		return nil, request.Context().Err()
+	}), "test-key", "claude-test")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := enhancer.Enhance(ctx, EnhancementInput{Notes: "# Deterministic"})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Enhance error = %v, want cancellation", err)
+	}
+}
+
 func TestAnthropicEnhancerRejectsInvalidUTF8NotesBeforeRequest(t *testing.T) {
 	requests := 0
 	enhancer := NewAnthropicEnhancer(roundTripperFunc(func(*http.Request) (*http.Response, error) {
@@ -163,14 +194,36 @@ func TestAnthropicEnhancerRejectsInvalidUTF8NotesBeforeRequest(t *testing.T) {
 	}
 }
 
+func TestAnthropicEnhancerRejectsRedirectBeforeForwardingCredentials(t *testing.T) {
+	targetRequests := 0
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		targetRequests++
+	}))
+	defer target.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
+	defer source.Close()
+
+	enhancer := NewAnthropicEnhancer(source.Client(), "test-key", "claude-test")
+	enhancer.Endpoint = source.URL
+	enhancer.MaxRetries = 0
+	_, err := enhancer.Enhance(context.Background(), EnhancementInput{Notes: "# Deterministic"})
+	if !errors.Is(err, ErrAnthropicRequest) || targetRequests != 0 {
+		t.Fatalf("Enhance error/target requests = %v/%d, want safe redirect error and zero target requests", err, targetRequests)
+	}
+}
+
 func TestAnthropicEnhancerRetriesOnlyRetryableResponses(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
 		if attempts < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"rate_limit_error","message":"retry"}}`))
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"# Release"}]}`))
 	}))
 	defer server.Close()
@@ -180,7 +233,7 @@ func TestAnthropicEnhancerRetriesOnlyRetryableResponses(t *testing.T) {
 	enhancer.MaxRetries = 2
 	got, err := enhancer.Enhance(context.Background(), EnhancementInput{Notes: "# Deterministic"})
 	if err != nil {
-		t.Fatalf("Enhance: %v", err)
+		t.Fatalf("Enhance: %v (attempts = %d)", err, attempts)
 	}
 	if attempts != 3 || !strings.Contains(got, "# Release") {
 		t.Fatalf("attempts = %d, notes = %q", attempts, got)
@@ -191,6 +244,9 @@ func TestAnthropicEnhancerStopsAfterBoundedRetryAndDoesNotLeakSecret(t *testing.
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
+		if got, want := r.Header.Get("X-Stainless-Retry-Count"), []string{"0", "1", "2"}[attempts-1]; got != want {
+			t.Errorf("X-Stainless-Retry-Count = %q, want %q", got, want)
+		}
 		w.WriteHeader(http.StatusBadGateway)
 		_, _ = w.Write([]byte("secret-value"))
 	}))
@@ -198,9 +254,9 @@ func TestAnthropicEnhancerStopsAfterBoundedRetryAndDoesNotLeakSecret(t *testing.
 
 	enhancer := NewAnthropicEnhancer(server.Client(), "secret-value", "claude-test")
 	enhancer.Endpoint = server.URL
-	enhancer.MaxRetries = 1
+	enhancer.MaxRetries = 2
 	_, err := enhancer.Enhance(context.Background(), EnhancementInput{Notes: "# Deterministic"})
-	if err == nil || attempts != 2 {
+	if err == nil || attempts != 3 {
 		t.Fatalf("err = %v, attempts = %d", err, attempts)
 	}
 	if !errors.Is(err, ErrAnthropicRequest) {
@@ -228,6 +284,7 @@ func TestAnthropicEnhancerRejectsTimeoutAndMalformedOrEmptyOutput(t *testing.T) 
 	for _, response := range []string{"not json", `{"content":[]}`, `{"content":[{"type":"text","text":"   "}]}`} {
 		t.Run(response, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(response))
 			}))
 			defer server.Close()
