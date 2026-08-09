@@ -12,6 +12,7 @@ Thank you for your interest in contributing to [Project Name]! We're excited to 
     * [Bug Reports](#bug-reports)
     * [Feature Requests](#feature-requests)
 * [Pull Requests](#pull-requests)
+* [Local pre-commit checks](#local-pre-commit-checks)
 * [Coding Standards](#coding-standards)
 * [Testing](#testing)
 * [Documentation](#documentation)
@@ -77,6 +78,34 @@ We follow a trunk-based development model for our codebase. This means that all 
 8.  Once your pull request is approved and all tests have passed, a project maintainer will merge your changes into the `main` branch.
 
 Please note that pull requests that do not follow the guidelines or are incomplete may be closed without explanation. We appreciate your understanding and cooperation in maintaining a high-quality codebase.
+
+## Local pre-commit checks
+
+Install the required local tools before committing:
+
+```shell
+python3 -m pip install --user pre-commit==4.6.1
+brew install trufflehog trivy
+```
+
+CI currently pins TruffleHog 3.96.0 and Trivy 0.73.0. Confirm your local
+versions support the configured command-line options before running the hooks.
+
+Install the Git hook only if you want it enabled in your checkout:
+
+```shell
+pre-commit install
+```
+
+Run the complete suite manually with
+`pre-commit run --all-files --show-diff-on-failure`. Managed hooks download
+their pinned environments on their first run. Formatters may modify files;
+review the resulting diff, re-stage the intended changes, and run the checks
+again before committing.
+
+Pull requests, direct updates to `main`, and release tags run the managed
+security scanners plus dedicated full-history Gitleaks and TruffleHog scans and
+a full-repository Trivy scan through `.github/workflows/security.yaml`.
 
 ## Coding Standards
 

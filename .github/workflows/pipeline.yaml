@@ -2,6 +2,8 @@ name: Pipeline
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   pull_request:
@@ -12,21 +14,52 @@ on:
       - reopened
       - synchronize
 
+permissions:
+  contents: read
+
 jobs:
   analysis:
     name: Analysis
     uses: ./.github/workflows/analysis.yaml
+
+  security:
+    name: Security
+    uses: ./.github/workflows/security.yaml
 
   tests:
     name: Tests
     needs: analysis
     uses: ./.github/workflows/tests.yaml
 
+  required-checks:
+    name: Required checks
+    if: ${{ always() }}
+    needs:
+      - analysis
+      - security
+      - tests
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Verify required jobs passed
+        shell: bash
+        env:
+          ANALYSIS_RESULT: ${{ needs.analysis.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+        run: |
+          set -euo pipefail
+          if [[ "${ANALYSIS_RESULT}" != "success" || \
+                "${SECURITY_RESULT}" != "success" || \
+                "${TESTS_RESULT}" != "success" ]]; then
+            echo "Required job failed: analysis=${ANALYSIS_RESULT}, security=${SECURITY_RESULT}, tests=${TESTS_RESULT}"
+            exit 1
+          fi
+
   release:
     name: Release
-    needs: 
-      - analysis
-      - tests
+    needs: required-checks
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     uses: ./.github/workflows/release.yaml
-    secrets: inherit

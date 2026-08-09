@@ -3,6 +3,9 @@ name: Analysis
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   Lint-Go:
     name: Lint Go

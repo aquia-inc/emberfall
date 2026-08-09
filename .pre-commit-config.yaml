@@ -1,0 +1,155 @@
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  # Hard security gates run before all other checks.
+  - repo: local
+    hooks:
+      - id: reject-tfplan
+        name: reject Terraform plan artifacts
+        language: system
+        entry: |-
+          bash -c 'if git diff --cached --name-only --diff-filter=ACM | grep -E "(^|/)(tfplan(\.[^/]+)?|[^/]+\.tfplan)$"; then
+          echo "REJECTED: Terraform plan artifacts can contain resolved secrets"; exit 1; fi'
+        pass_filenames: false
+        always_run: true
+
+      - id: trufflehog-full-repo
+        name: TruffleHog full-repository verified secret scan
+        language: system
+        entry: |-
+          bash -c 'if ! command -v trufflehog >/dev/null 2>&1; then
+          echo "trufflehog is required but was not found on PATH"; exit 1; fi
+          env -u PRE_COMMIT trufflehog git file://. --results=verified --no-update --fail --fail-on-scan-errors'
+        pass_filenames: false
+        always_run: true
+
+      - id: trivy-filesystem
+        name: Trivy filesystem vulnerability, secret, and misconfiguration scan
+        language: system
+        entry: |-
+          bash -c 'if ! command -v trivy >/dev/null 2>&1; then
+          echo "trivy is required but was not found on PATH"; exit 1; fi
+          trivy fs . --scanners vuln,secret,misconfig --severity MEDIUM,HIGH,CRITICAL --exit-code 1 --quiet'
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: check-yaml
+      - id: check-json
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-case-conflict
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: [--severity=error]
+        files: '\.(sh|bash|bats)$'
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.29.0
+    hooks:
+      - id: zizmor
+        files: '^(\.github/workflows/.*\.ya?ml|action\.ya?ml)$'
+        args: [--offline, --no-progress]
+
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: 3.3.9
+    hooks:
+      - id: checkov
+        files: '^(\.github/workflows/.*\.ya?ml|action\.ya?ml)$'
+        args: [--framework, github_actions, --quiet, --compact]
+
+  - repo: https://github.com/returntocorp/semgrep
+    rev: v1.172.0
+    hooks:
+      - id: semgrep
+        files: '\.go$'
+        pass_filenames: false
+        args: [--config, p/golang, --error, --severity, WARNING, --severity, ERROR, .]
+
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt
+        entry: gofmt -w
+        language: system
+        types: [go]
+
+      - id: go-vet
+        name: go vet
+        entry: env GOTOOLCHAIN=local go vet ./...
+        language: system
+        pass_filenames: false
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+
+      - id: go-test
+        name: go test
+        entry: env GOTOOLCHAIN=local go test ./...
+        language: system
+        pass_filenames: false
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+
+      - id: go-mod-verify
+        name: go mod verify
+        entry: env GOTOOLCHAIN=local go mod verify
+        language: system
+        pass_filenames: false
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+
+      - id: staticcheck
+        name: Staticcheck
+        entry: env GOTOOLCHAIN=local go run honnef.co/go/tools/cmd/staticcheck@v0.6.1 ./...
+        language: system
+        pass_filenames: false
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+
+      - id: gosec
+        name: gosec
+        entry: env GOTOOLCHAIN=local go run github.com/securego/gosec/v2/cmd/gosec@v2.23.0 ./...
+        language: system
+        pass_filenames: false
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+
+      - id: govulncheck
+        name: govulncheck
+        entry: env GOTOOLCHAIN=local go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+        language: system
+        pass_filenames: false
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+
+      - id: actionlint
+        name: Actionlint
+        entry: env GOTOOLCHAIN=local go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.11
+        language: system
+        files: '^\.github/workflows/.*\.ya?ml$'
+        pass_filenames: true
+
+      - id: bearer-go
+        name: Bearer Go scan
+        entry: |-
+          bash -c 'set -eu
+          repo_dir=$PWD
+          go_root=$(env GOTOOLCHAIN=local go env GOROOT)
+          go_bin="$go_root/bin/go"
+          module_cache=$(env GOTOOLCHAIN=local "$go_bin" env GOMODCACHE)
+          module_dir="$module_cache/github.com/bearer/bearer@v1.50.1"
+          if [ ! -d "$module_dir" ]; then env GOTOOLCHAIN=local "$go_bin" mod download github.com/bearer/bearer@v1.50.1; fi
+          cd "$module_dir"
+          env GOTOOLCHAIN=local "$go_bin" run ./cmd/bearer scan "$repo_dir" --severity medium --quiet'
+        language: system
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+        pass_filenames: false
