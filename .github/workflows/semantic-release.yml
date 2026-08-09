@@ -41,7 +41,7 @@ jobs:
       sha: ${{ steps.tested-main.outputs.sha }}
     steps:
       - name: Check out live main for validation
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
@@ -51,7 +51,7 @@ jobs:
         id: tested-main
         run: echo "sha=$(git rev-parse 'HEAD^{commit}')" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
@@ -68,7 +68,7 @@ jobs:
         run: go build -o "$RUNNER_TEMP/emberfall" .
 
       - id: setup-bats
-        uses: bats-core/bats-action@2104b40bb7b6c2d5110b23a26b0bf265ab8027db # 3.0.0
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # 4.0.0
 
       - name: Test CLI
         shell: bash
@@ -95,7 +95,7 @@ jobs:
       bump: ${{ steps.release.outputs.bump }}
     steps:
       - name: Check out tested main without release credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
@@ -106,20 +106,20 @@ jobs:
           TESTED_MAIN_SHA: ${{ needs.validate-main.outputs.sha }}
         run: test "$(git rev-parse 'HEAD^{commit}')" = "$TESTED_MAIN_SHA"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
       - name: Create release app token
         id: app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.SEMANTIC_RELEASE_APP_ID }}
           private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
 
       - name: Authenticate tested main
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
