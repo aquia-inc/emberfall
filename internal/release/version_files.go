@@ -17,12 +17,14 @@ var (
 type versionFileOperations struct {
 	rename func(string, string) error
 	remove func(string) error
+	sync   func(*os.File) error
 	write  func(*os.File, []byte) (int, error)
 }
 
 var operatingSystemVersionFiles = versionFileOperations{
 	rename: os.Rename,
 	remove: os.Remove,
+	sync:   (*os.File).Sync,
 	write:  (*os.File).Write,
 }
 
@@ -196,6 +198,9 @@ func writeVersionTemp(path string, contents []byte, mode os.FileMode, ops versio
 			writeErr = io.ErrShortWrite
 		}
 		operationErr = writeErr
+		if operationErr == nil {
+			operationErr = ops.sync(temp)
+		}
 	}
 	operationErr = errors.Join(operationErr, temp.Close())
 	if operationErr != nil {

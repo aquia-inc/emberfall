@@ -190,6 +190,39 @@ func TestVersionFilesApplyRestoresFirstFileAfterSecondReplaceFailure(t *testing.
 	assertNoVersionTemps(t, root)
 }
 
+func TestVersionFilesApplyDoesNotReplaceFilesWhenSecondStagedSyncFails(t *testing.T) {
+	rootGo := "Version: \"0.5.0\"\n"
+	bats := "assert_output \"emberfall version 0.5.0\"\n"
+	root := writeVersionFixture(t, rootGo, bats)
+	files, err := PrepareVersionFiles(root, Version{Major: 0, Minor: 6, Patch: 0})
+	if err != nil {
+		t.Fatalf("PrepareVersionFiles: %v", err)
+	}
+
+	syncFailure := errors.New("forced second staged-file sync failure")
+	realSync := files.ops.sync
+	syncCalls := 0
+	files.ops.sync = func(file *os.File) error {
+		syncCalls++
+		if syncCalls == 2 {
+			return syncFailure
+		}
+		return realSync(file)
+	}
+
+	err = files.Apply()
+	if !errors.Is(err, syncFailure) {
+		t.Fatalf("Apply error = %v, want staged-file sync failure", err)
+	}
+	if got := readFile(t, filepath.Join(root, "cmd", "root.go")); got != rootGo {
+		t.Errorf("cmd/root.go changed after staging sync failure: %q", got)
+	}
+	if got := readFile(t, filepath.Join(root, "tests", "cli.bats")); got != bats {
+		t.Errorf("tests/cli.bats changed after staging sync failure: %q", got)
+	}
+	assertNoVersionTemps(t, root)
+}
+
 func TestVersionFilesRestoreRestoresExactOriginalBytesAndModes(t *testing.T) {
 	rootGo := "// retained header\r\nVersion: \"v0.5.0\"\r\n// retained trailer\r\n"
 	bats := "# retained header\r\nassert_output \"emberfall version v0.5.0\"\r\n# retained trailer\r\n"
