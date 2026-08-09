@@ -1,6 +1,6 @@
 # MIT License
 
-Copyright (c) 2024 Aquia Inc. 
+Copyright (c) 2024-2026 Aquia Inc. 
 https://www.aquia.us
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
