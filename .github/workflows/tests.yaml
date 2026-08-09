@@ -24,7 +24,7 @@ jobs:
         run: go build -o ./emberfall .
 
       - id: setup-bats
-        uses: bats-core/bats-action@3.0.0
+        uses: bats-core/bats-action@2104b40bb7b6c2d5110b23a26b0bf265ab8027db # 3.0.0
 
       - name: Test CLI
         shell: bash

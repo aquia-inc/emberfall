@@ -48,9 +48,9 @@ jobs:
           go-version-file: go.mod
 
       - name: LINT - go
-        uses: dominikh/staticcheck-action@v1
+        uses: dominikh/staticcheck-action@9716614d4101e79b4340dd97b10e54d68234e431 # v1.4.1
         with:
-          version: "latest"
+          version: "2026.1"
           working-directory: ./
 
       - name: Test
@@ -60,7 +60,7 @@ jobs:
         run: go build -o "$RUNNER_TEMP/emberfall" .
 
       - id: setup-bats
-        uses: bats-core/bats-action@3.0.0
+        uses: bats-core/bats-action@2104b40bb7b6c2d5110b23a26b0bf265ab8027db # 3.0.0
 
       - name: Test CLI
         shell: bash
