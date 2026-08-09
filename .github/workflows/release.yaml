@@ -3,6 +3,9 @@ name: Release
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   compile:
     name: Compile and Publish

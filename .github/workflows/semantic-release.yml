@@ -10,10 +10,17 @@ concurrency:
   group: semantic-release-main
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   analysis:
     name: Analysis
     uses: ./.github/workflows/analysis.yaml
+
+  security:
+    name: Security
+    uses: ./.github/workflows/security.yaml
 
   tests:
     name: Tests
@@ -25,6 +32,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs:
       - analysis
+      - security
       - tests
     runs-on: ubuntu-latest
     permissions:
