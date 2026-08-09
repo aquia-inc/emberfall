@@ -233,7 +233,7 @@ func newRemoteRepository(t *testing.T) (testRepository, string) {
 	t.Helper()
 	repo := newTestRepository(t)
 	remote := filepath.Join(t.TempDir(), "remote.git")
-	mustRun(t, repo.dir, "git", "init", "--bare", remote)
+	mustRun(t, repo.dir, "git", "init", "--bare", "--initial-branch=main", remote)
 	repo.git(t, "remote", "add", "origin", remote)
 	return repo, remote
 }
