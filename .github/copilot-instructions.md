@@ -6,15 +6,11 @@ When generating or suggesting a commit message or pull request title:
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/) syntax:
   `<type>(<optional-scope>): <description>`.
-- Prefer the types `feat`, `fix`, `perf`, `docs`, `refactor`, `test`, `build`,
-  `ci`, `chore`, and `revert`.
-- Use a lowercase type and scope, an imperative description, and no trailing
-  period.
+- Prefer the types `feat`, `fix`, `perf`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`, and `revert`.
+- Use a lowercase type and scope, an imperative description, and no trailing period.
 - Include a scope only when it makes the affected area clearer.
-- Mark breaking changes with `!` before the colon and explain the break in the
-  commit or pull request body.
-- Base the pull request title on the complete diff. Do not prefix it with a
-  branch name, issue number, emoji, or labels such as `PR`.
+- Mark breaking changes with `!` before the colon and explain the break in the commit or pull request body.
+- Base the pull request title on the complete diff. Do not prefix it with a branch name, issue number, emoji, or labels such as `PR`.
 
 Examples:
 
@@ -22,6 +18,4 @@ Examples:
 - `docs: clarify the release process`
 - `refactor(engine)!: replace the request configuration format`
 
-Keep pull request descriptions concise and include the motivation, material
-changes, validation performed, and related issues. Follow `CONTRIBUTING.md` for
-the repository's complete contribution requirements.
+Keep pull request descriptions concise and include the motivation, material changes, validation performed, and related issues. Follow `CONTRIBUTING.md` for the repository's complete contribution requirements.
