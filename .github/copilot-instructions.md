@@ -9,7 +9,7 @@ When generating or suggesting a commit message or pull request title:
 - Prefer the types `feat`, `fix`, `perf`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`, and `revert`.
 - Use a lowercase type and scope, an imperative description, and no trailing period.
 - Include a scope only when it makes the affected area clearer.
-- Mark breaking changes with `!` before the colon and explain the break in the commit or pull request body.
+- For commit messages, mark breaking changes with `!` before the colon or a `BREAKING CHANGE: <description>` footer; both are allowed. If using `!`, describe the break in the subject. For pull request titles, use `!`, describe the break in the title, and explain it in the pull request body.
 - Base the pull request title on the complete diff. Do not prefix it with a branch name, issue number, emoji, or labels such as `PR`.
 
 Examples:
