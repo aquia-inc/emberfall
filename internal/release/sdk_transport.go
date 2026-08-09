@@ -27,6 +27,26 @@ type BoundedSDKTransport struct {
 	maxBytes int64
 }
 
+type sdkTransportError struct {
+	operation string
+	cause     error
+}
+
+func (e *sdkTransportError) Error() string {
+	switch e.operation {
+	case "read":
+		return "read sdk response"
+	case "close":
+		return "close sdk response"
+	default:
+		return "sdk response operation failed"
+	}
+}
+
+func (e *sdkTransportError) Unwrap() error {
+	return e.cause
+}
+
 // NewBoundedSDKTransport returns a transport that accepts at most maxBytes in
 // each response. A nil base uses http.DefaultTransport.
 func NewBoundedSDKTransport(base http.RoundTripper, maxBytes int64) *BoundedSDKTransport {
@@ -51,11 +71,17 @@ func (t *BoundedSDKTransport) RoundTrip(request *http.Request) (*http.Response, 
 
 	payload, oversize, readErr := readSDKResponse(response.Body, t.maxBytes)
 	closeErr := response.Body.Close()
+	if readErr != nil && closeErr != nil {
+		return nil, errors.Join(
+			&sdkTransportError{operation: "read", cause: readErr},
+			&sdkTransportError{operation: "close", cause: closeErr},
+		)
+	}
 	if readErr != nil {
-		return nil, errors.New("read sdk response")
+		return nil, &sdkTransportError{operation: "read", cause: readErr}
 	}
 	if closeErr != nil {
-		return nil, errors.New("close sdk response")
+		return nil, &sdkTransportError{operation: "close", cause: closeErr}
 	}
 	if oversize {
 		return nil, fmt.Errorf("%w: limit %d bytes", ErrSDKResponseTooLarge, t.maxBytes)

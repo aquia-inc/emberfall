@@ -102,6 +102,71 @@ func TestBoundedSDKTransportRejectsMalformedOrTrailingSuccessfulJSON(t *testing.
 	}
 }
 
+func TestBoundedSDKTransportPreservesBodyFailureCausesWithoutLeakingSensitiveText(t *testing.T) {
+	const responseSecret = "response-secret"
+	const credentialSecret = "credential-secret"
+	readCause := errors.New("read failure containing " + responseSecret + " and " + credentialSecret)
+	closeCause := errors.New("close failure containing " + responseSecret + " and " + credentialSecret)
+
+	tests := []struct {
+		name       string
+		readErr    error
+		closeErr   error
+		wantCauses []error
+	}{
+		{
+			name:       "read only",
+			readErr:    readCause,
+			wantCauses: []error{readCause},
+		},
+		{
+			name:       "close only",
+			closeErr:   closeCause,
+			wantCauses: []error{closeCause},
+		},
+		{
+			name:       "read and close",
+			readErr:    readCause,
+			closeErr:   closeCause,
+			wantCauses: []error{readCause, closeCause},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := &transportTrackingReadCloser{
+				Reader:   strings.NewReader(`{"ok":true}`),
+				readErr:  test.readErr,
+				closeErr: test.closeErr,
+			}
+			transport := NewBoundedSDKTransport(transportFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
+			}), 1<<20)
+			request := httptest.NewRequest(http.MethodGet, "https://example.test/releases", nil)
+			request.Header.Set("Authorization", "Bearer "+credentialSecret)
+
+			response, err := transport.RoundTrip(request)
+			if response != nil {
+				t.Errorf("response = %#v, want nil", response)
+			}
+			if err == nil {
+				t.Fatal("RoundTrip error = nil, want body failure")
+			}
+			for _, cause := range test.wantCauses {
+				if !errors.Is(err, cause) {
+					t.Errorf("errors.Is(%v) = false, want true", cause)
+				}
+			}
+			if strings.Contains(err.Error(), responseSecret) || strings.Contains(err.Error(), credentialSecret) {
+				t.Errorf("error leaked sensitive data: %v", err)
+			}
+			if !body.closed {
+				t.Error("original response body was not closed")
+			}
+		})
+	}
+}
+
 func TestBoundedSDKTransportLeavesNon2xxBodyForSDKDecoding(t *testing.T) {
 	const payload = "not JSON"
 	body := &transportTrackingReadCloser{Reader: strings.NewReader(payload)}
@@ -151,11 +216,16 @@ func (fn transportFunc) RoundTrip(request *http.Request) (*http.Response, error)
 
 type transportTrackingReadCloser struct {
 	io.Reader
-	closed bool
-	read   int64
+	closed   bool
+	read     int64
+	readErr  error
+	closeErr error
 }
 
 func (r *transportTrackingReadCloser) Read(p []byte) (int, error) {
+	if r.readErr != nil {
+		return 0, r.readErr
+	}
 	n, err := r.Reader.Read(p)
 	r.read += int64(n)
 	return n, err
@@ -163,5 +233,5 @@ func (r *transportTrackingReadCloser) Read(p []byte) (int, error) {
 
 func (r *transportTrackingReadCloser) Close() error {
 	r.closed = true
-	return nil
+	return r.closeErr
 }
