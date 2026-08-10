@@ -20,7 +20,7 @@ Flags:
 ```
 > **_NOTE:_**  When using `--url` the value provided will be compiled as a Go-compatible regular expression and used to match against the `url` field for each test. To define multiple tests use the pipe symbol (|), for example to include foo, bar, and baz use `--url 'foo|bar|baz'`. To include all tests without TLS (that start with `http:`) use `--url '^http:'`. To include all tests that contain users, but excludes sub-resources (like users/<id>/comments) use `--url '\/users(\/?\d+)$'` (be sure to use single quotes to avoid shell expansion)
 
-> **_NOTE:_**  `--method` works the same way, matching against the `method` field for each test. Use `--method 'POST|PUT'` to run only the tests that write, or `--method '^GET$'` to run only reads. `--url` and `--method` combine, so `--url '/users' --method '^GET$'` selects the tests that satisfy both.
+> **_NOTE:_**  `--method` works the same way, matching against each test's `method` field as written in the config. Use `--method '^GET$'` to run only reads, or `--method 'POST|PUT|PATCH|DELETE'` to run only tests that write. `--url` and `--method` combine, so `--url '/users' --method '^GET$'` selects the tests that satisfy both. A test that omits `method:` sends a GET at request time but has an empty `method` field, so method filters will not match it.
 
 ## Configuring Tests
 

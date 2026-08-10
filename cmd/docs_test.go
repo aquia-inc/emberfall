@@ -43,13 +43,17 @@ func helpSchema(t *testing.T) string {
 }
 
 // yamlBlocks returns the contents of every ```yaml fenced block in markdown.
-func yamlBlocks(markdown string) []string {
+// An unterminated fence fails the test rather than silently dropping the block
+// from coverage.
+func yamlBlocks(t *testing.T, markdown string) []string {
+	t.Helper()
 	var blocks []string
 	var current []string
 	inBlock := false
 	for line := range strings.SplitSeq(markdown, "\n") {
 		if !inBlock {
-			if strings.TrimSpace(line) == "```yaml" {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "```yaml" || trimmed == "```yml" {
 				inBlock = true
 				current = nil
 			}
@@ -61,6 +65,9 @@ func yamlBlocks(markdown string) []string {
 			continue
 		}
 		current = append(current, line)
+	}
+	if inBlock {
+		t.Fatal("README contains an unterminated yaml code fence")
 	}
 	return blocks
 }
@@ -84,7 +91,7 @@ func TestREADMEFlagBlockMatchesCLI(t *testing.T) {
 // one place has to be made in the other.
 func TestREADMESchemaMatchesHelp(t *testing.T) {
 	want := helpSchema(t)
-	for _, block := range yamlBlocks(readREADME(t)) {
+	for _, block := range yamlBlocks(t, readREADME(t)) {
 		if strings.TrimSpace(block) == want {
 			return
 		}
@@ -97,7 +104,7 @@ func TestREADMESchemaMatchesHelp(t *testing.T) {
 func TestREADMEExampleConfigsParse(t *testing.T) {
 	schema := helpSchema(t)
 	examples := 0
-	for index, block := range yamlBlocks(readREADME(t)) {
+	for index, block := range yamlBlocks(t, readREADME(t)) {
 		// The schema block describes field types rather than values.
 		if strings.TrimSpace(block) == schema {
 			continue
@@ -118,5 +125,35 @@ func TestREADMEExampleConfigsParse(t *testing.T) {
 	}
 	if examples == 0 {
 		t.Fatal("found no README example configs to validate")
+	}
+}
+
+// The GitHub Action examples pin the released version, which on main is the
+// version in cmd/root.go, so a release bump that skips the README fails here.
+func TestREADMEActionExamplesPinCurrentVersion(t *testing.T) {
+	pins := 0
+	for index, block := range yamlBlocks(t, readREADME(t)) {
+		if !strings.Contains(block, `uses: "aquia-inc/emberfall`) {
+			continue
+		}
+		found := false
+		for line := range strings.SplitSeq(block, "\n") {
+			trimmed := strings.TrimSpace(line)
+			version, ok := strings.CutPrefix(trimmed, "version: ")
+			if !ok {
+				continue
+			}
+			found = true
+			pins++
+			if version != rootCmd.Version {
+				t.Errorf("README action example %d pins version %s; the binary is %s", index, version, rootCmd.Version)
+			}
+		}
+		if !found {
+			t.Errorf("README action example %d has no version pin:\n%s", index, block)
+		}
+	}
+	if pins == 0 {
+		t.Fatal("found no README action examples to validate")
 	}
 }
