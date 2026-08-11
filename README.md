@@ -12,12 +12,15 @@ Simply declare a list of URLs along with their expected response values, and Emb
 emberfall [flags]
 
 Flags:
-  -c, --tests string    Path to tests config file. - to read from stdin (default "-")
   -h, --help            help for emberfall
+  -m, --method string   Regular expression to include only tests with a matching method
+  -t, --tests string    Path to tests configuration file. - to read from stdin (default "-")
   -u, --url string      Regular expression to include only tests with a matching url
   -v, --version         version for emberfall
 ```
 > **_NOTE:_**  When using `--url` the value provided will be compiled as a Go-compatible regular expression and used to match against the `url` field for each test. To define multiple tests use the pipe symbol (|), for example to include foo, bar, and baz use `--url 'foo|bar|baz'`. To include all tests without TLS (that start with `http:`) use `--url '^http:'`. To include all tests that contain users, but excludes sub-resources (like users/<id>/comments) use `--url '\/users(\/?\d+)$'` (be sure to use single quotes to avoid shell expansion)
+
+> **_NOTE:_**  `--method` works the same way, matching against each test's `method` field as written in the config. Use `--method '^GET$'` to run only reads, or `--method 'POST|PUT|PATCH|DELETE'` to run only tests that write. `--url` and `--method` combine, so `--url '/users' --method '^GET$'` selects the tests that satisfy both. A test that omits `method:` sends a GET at request time but has an empty `method` field, so method filters will not match it.
 
 ## Configuring Tests
 
@@ -62,7 +65,8 @@ tests:
   method: GET
   expect:
     status: 401
-    body: "unauthorized"
+    body:
+      text: "unauthorized"
 ```
 
 ### Reponse References
@@ -126,7 +130,8 @@ tests:
   method: GET
   expect:
     status: 401
-    body: "unauthorized"
+    body:
+      text: "unauthorized"
   
   # ensure including authorization header returns current user
 - url: http://localhost:3000/api/v1/users/current
@@ -164,7 +169,7 @@ Define tests in a YAML file like show above, and run emberfall: `emberfall --tes
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.4.0
+   version: 0.5.0
    config: # string: YAML tests config inlined
    file: # string: path/to/tests
 ```
@@ -178,7 +183,7 @@ This is helpful for either short tests or for testing Emberfall integration with
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.4.0
+   version: 0.5.0
    config: | 
     ---
     tests:  
@@ -198,6 +203,6 @@ For longer tests it's best to place those in their own file like so
 ```yaml
   uses: "aquia-inc/emberfall@main"
   with:
-   version: 0.4.0
+   version: 0.5.0
    file: path/to/tests.yml   
 ```

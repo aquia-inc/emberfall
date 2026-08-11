@@ -23,9 +23,10 @@ const maxMultipartFileSize = 50 * 1024 * 1024 // 50 MiB
 // quoteEscaper mirrors the stdlib's mime/multipart.escapeQuotes (which is
 // unexported) so that field and filename values are quoted the same way
 // CreateFormFile would do it. Non-ASCII bytes are passed through as raw UTF-8,
-// which lenient servers parse correctly. Strict RFC 5987 (filename*=UTF-8''...)
-// encoding is not implemented; non-ASCII filenames may not interoperate with
-// servers that reject anything outside the legacy quoted-string form.
+// which lenient servers parse correctly. Strict RFC 5987 encoding
+// (filename*=charset'lang'value) is not implemented; non-ASCII filenames may
+// not interoperate with servers that reject anything outside the legacy
+// quoted-string form.
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 // writeMultipart writes a multipart/form-data payload into buf and returns the
