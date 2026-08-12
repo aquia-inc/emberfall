@@ -1,0 +1,187 @@
+name: Security
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  managed-checks:
+    name: Managed security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install pre-commit
+        run: python -m pip install --disable-pip-version-check pre-commit==4.6.1
+
+      - name: Reject tracked Terraform plan artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=0
+          while IFS= read -r -d '' path; do
+            case "${path}" in
+              tfplan|tfplan.*|*.tfplan|*/tfplan|*/tfplan.*)
+                echo "REJECTED: ${path} can contain resolved secrets"
+                found=1
+                ;;
+            esac
+          done < <(git ls-files -z)
+          exit "${found}"
+
+      # TruffleHog and Trivy run as dedicated full-repository jobs below.
+      # These hook IDs keep the remaining CI scanners identical to the pinned
+      # local configuration while avoiding formatter-only changes in CI.
+      - name: Run managed security scanners
+        shell: bash
+        run: |
+          set -uo pipefail
+          status=0
+          hooks=(
+            detect-private-key
+            shellcheck
+            zizmor
+            checkov
+            semgrep
+            staticcheck
+            gosec
+            govulncheck
+            actionlint
+            bearer-go
+          )
+          for hook in "${hooks[@]}"; do
+            if ! pre-commit run "${hook}" --all-files; then
+              status=1
+            fi
+          done
+          exit "${status}"
+
+  gitleaks:
+    name: Gitleaks full history
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out full repository history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Gitleaks
+        shell: bash
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          release_url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl --proto "=https" --tlsv1.2 --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/${archive}" "${release_url}/${archive}"
+          (
+            cd "${RUNNER_TEMP}"
+            printf '%s  %s\n' "${GITLEAKS_SHA256}" "${archive}" | sha256sum --check
+          )
+          mkdir -p "${RUNNER_TEMP}/bin"
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}/bin" gitleaks
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+
+      - name: Scan full repository history
+        shell: bash
+        run: gitleaks git "${GITHUB_WORKSPACE}" --redact --verbose
+
+  trufflehog:
+    name: TruffleHog verified secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out full repository history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install TruffleHog
+        shell: bash
+        env:
+          TRUFFLEHOG_VERSION: "3.96.0"
+          TRUFFLEHOG_SHA256: "7105f1cd6577f058a9e39d0578f1a99c8a1e481e4d3512cd8a09acfe22a0fdc0"
+        run: |
+          set -euo pipefail
+          archive="trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          release_url="https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}"
+          curl --proto "=https" --tlsv1.2 --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/${archive}" "${release_url}/${archive}"
+          (
+            cd "${RUNNER_TEMP}"
+            printf '%s  %s\n' "${TRUFFLEHOG_SHA256}" "${archive}" | sha256sum --check
+          )
+          mkdir -p "${RUNNER_TEMP}/bin"
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}/bin" trufflehog
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+
+      - name: Scan full repository history
+        shell: bash
+        run: >-
+          env -u PRE_COMMIT trufflehog git "file://${GITHUB_WORKSPACE}"
+          --results=verified --no-update --fail --fail-on-scan-errors
+
+  trivy:
+    name: Trivy filesystem
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan vulnerabilities, secrets, and misconfigurations
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: "v0.73.0"
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "1"
+          format: table
+          hide-progress: true

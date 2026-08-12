@@ -3,6 +3,9 @@ name: Tests
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: BATS cli
@@ -10,19 +13,29 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
       - name: Check out repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
 
       - name: Test Go
         run: go test ./...
 
       - name: Compile
-        run: go build -o ./ ./...
+        run: go build -o ./emberfall .
 
       - id: setup-bats
-        uses: bats-core/bats-action@3.0.0
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # 4.0.0
 
       - name: Test CLI
         shell: bash

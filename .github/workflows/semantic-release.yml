@@ -1,0 +1,165 @@
+name: Semantic Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: semantic-release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    name: Analysis
+    uses: ./.github/workflows/analysis.yaml
+
+  security:
+    name: Security
+    uses: ./.github/workflows/security.yaml
+
+  tests:
+    name: Tests
+    needs: analysis
+    uses: ./.github/workflows/tests.yaml
+
+  validate-main:
+    name: Validate Current Main
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - analysis
+      - security
+      - tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.tested-main.outputs.sha }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out live main for validation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record tested main
+        id: tested-main
+        run: echo "sha=$(git rev-parse 'HEAD^{commit}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: LINT - go
+        uses: dominikh/staticcheck-action@9716614d4101e79b4340dd97b10e54d68234e431 # v1.4.1
+        with:
+          version: "2026.1"
+          working-directory: ./
+
+      - name: Test
+        run: go test ./...
+
+      - name: Compile
+        run: go build -o "$RUNNER_TEMP/emberfall" .
+
+      - id: setup-bats
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # 4.0.0
+
+      - name: Test CLI
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        env:
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
+          TERM: xterm
+        run: |
+          ln -s "$GITHUB_WORKSPACE/tests" ./tests
+          bats "$GITHUB_WORKSPACE/tests/cli.bats"
+
+  release:
+    name: Prepare and Publish Release
+    if: github.ref == 'refs/heads/main'
+    needs: validate-main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_needed: ${{ steps.release.outputs.release_needed }}
+      previous_version: ${{ steps.release.outputs.previous_version }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      bump: ${{ steps.release.outputs.bump }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Check out tested main without release credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify pre-auth checkout is tested main
+        env:
+          TESTED_MAIN_SHA: ${{ needs.validate-main.outputs.sha }}
+        run: test "$(git rev-parse 'HEAD^{commit}')" = "$TESTED_MAIN_SHA"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.SEMANTIC_RELEASE_APP_ID }}
+          private-key: ${{ secrets.SEMANTIC_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Authenticate tested main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Verify authenticated checkout is tested main
+        env:
+          TESTED_MAIN_SHA: ${{ needs.validate-main.outputs.sha }}
+        run: test "$(git rev-parse 'HEAD^{commit}')" = "$TESTED_MAIN_SHA"
+
+      - name: Configure release bot identity
+        run: |
+          git config user.name "emberfall-release[bot]"
+          git config user.email "emberfall-release[bot]@users.noreply.github.com"
+
+      - name: Prepare release
+        id: release
+        run: go run ./cmd/emberfall-release prepare --github-output "$GITHUB_OUTPUT"
+
+      - name: Build proposed release
+        if: steps.release.outputs.release_needed == 'true'
+        env:
+          PROPOSED_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          go build -o "$RUNNER_TEMP/emberfall" .
+          actual_version="$("$RUNNER_TEMP/emberfall" --version)"
+          test "$actual_version" = "emberfall version $PROPOSED_VERSION"
+
+      - name: Publish release
+        if: steps.release.outputs.release_needed == 'true'
+        env:
+          PROPOSED_VERSION: ${{ steps.release.outputs.version }}
+        run: go run ./cmd/emberfall-release publish --version "$PROPOSED_VERSION"

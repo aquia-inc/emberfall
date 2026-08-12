@@ -2,8 +2,9 @@ version: 2
 
 before:
   hooks:
-    - go mod tidy
+    - go mod tidy -diff
     - go generate ./...
+    - git diff --exit-code
 
 builds:
   - env:
@@ -14,7 +15,8 @@ builds:
       - darwin
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -25,7 +27,8 @@ archives:
 
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 changelog:
   sort: asc
@@ -34,20 +37,27 @@ changelog:
       - '^docs(\([^)]+\))?:'
       - '^test(\([^)]+\))?:'
 
-brews:
+homebrew_casks:
   - name: emberfall
-    goarm: 6
-    goamd64: v1
-    url_template: "https://github.com/aquia-inc/emberfall/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    url_headers:
-      - "Accept: application/octet-stream"
-    download_strategy: CurlDownloadStrategy
+    binaries:
+      - emberfall
+    url:
+      template: "https://github.com/aquia-inc/emberfall/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+      headers:
+        - "Accept: application/octet-stream"
     commit_author:
       name: goreleaserbot
       email: goreleaserbot@aquia.us
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    directory: Formula
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Casks
     description: "Smoke testing for HTTP services made easy!"
+    homepage: "https://github.com/aquia-inc/emberfall"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/emberfall"]
+          end
     repository:
       owner: aquia-inc
       name: emberfall

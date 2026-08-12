@@ -148,13 +148,27 @@ tests:
 ### Installation
 
 **Homebrew**
+
 ```sh
 brew tap aquia-inc/emberfall https://github.com/aquia-inc/emberfall
-brew install emberfall
+brew install --cask aquia-inc/emberfall/emberfall
 ```
+
+Existing installations of the legacy Homebrew formula migrate to the cask the
+next time Homebrew updates this tap. If automatic updates are disabled or
+Homebrew does not complete the migration, use this manual fallback:
+
+```sh
+brew tap aquia-inc/emberfall https://github.com/aquia-inc/emberfall
+brew uninstall --formula emberfall
+brew install --cask aquia-inc/emberfall/emberfall
+```
+
 **Build from Source**
+
 1. Fork or clone this repository
 2. From the project root run
+
 ```bash
 go install ./...
 ```
